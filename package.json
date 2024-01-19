@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "start-host": "node ./dist/index.js host --serial-port=COM1",
+    "start-proxy": "node ./dist/index.js proxy --serial-port=COM2 --port=13808 --listen=0.0.0.0",
+    "list-ports": "node ./dist/index.js list",
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "@types/node": "^20.11.4",
+    "dayjs": "^1.11.10",
+    "esbuild": "^0.19.11",
+    "serialport": "^12.0.0"
+  }
+}
