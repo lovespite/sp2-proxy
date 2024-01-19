@@ -1,10 +1,10 @@
 export default function printUsage() {
   console.log(`Usage: node ${process.argv[1]} <command> [options]`);
   console.log("General options:");
-  console.log(`  --serialPort, -s <path>`);
+  console.log(`  --serial-port, -s <path>`);
   console.log(`    Specify the serial port to connect.`);
   console.log(`    Default: . (Use the first available port)`);
-  console.log(`  --baudRate, -b <baudRate>`);
+  console.log(`  --baud-rate, -b <baudRate>`);
   console.log(`    Specify the baud rate.`);
   console.log(`    Default: 1600000`);
   console.log(``);
