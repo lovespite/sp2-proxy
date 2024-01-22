@@ -22,44 +22,141 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // src/model/Channel.ts
-var import_stream = require("stream");
+var import_stream2 = require("stream");
 
-// src/model/DataPack.ts
-function getNullPack(cid) {
+// src/utils/random.ts
+var counter = 0;
+function getNextCount() {
+  return counter++;
+}
+function getNextRandomToken() {
+  return getNextCount().toString(36);
+}
+
+// src/utils/frame.ts
+var import_stream = require("stream");
+var MetaSize = 16;
+var DataSegmentSize = 1500;
+var EscapeChar = 16;
+var FrameBeg = 2;
+var FrameEnd = 3;
+var SpecialChars = [EscapeChar, FrameBeg, FrameEnd];
+var SpecialCharSet = new Set(SpecialChars);
+function escapeBuffer(buffer) {
+  let estimatedSize = buffer.length;
+  for (const byte of buffer) {
+    if (SpecialCharSet.has(byte)) {
+      estimatedSize++;
+    }
+  }
+  const escapedBuffer = Buffer.allocUnsafe(estimatedSize);
+  let tarPos = 0;
+  for (const byte of buffer) {
+    if (SpecialCharSet.has(byte)) {
+      escapedBuffer[tarPos++] = EscapeChar;
+      escapedBuffer[tarPos++] = byte ^ 255;
+    } else {
+      escapedBuffer[tarPos++] = byte;
+    }
+  }
+  return escapedBuffer;
+}
+function unescapeBuffer(escapedBuffer) {
+  const buffer = Buffer.allocUnsafe(escapedBuffer.length);
+  let tarPos = 0;
+  for (let srcPos = 0; srcPos < escapedBuffer.length; srcPos++) {
+    const byte = escapedBuffer[srcPos];
+    if (byte === EscapeChar) {
+      const nextByte = escapedBuffer[srcPos + 1];
+      buffer[tarPos++] = nextByte ^ 255;
+      srcPos++;
+    } else {
+      buffer[tarPos++] = byte;
+    }
+  }
+  return buffer.subarray(0, tarPos);
+}
+function buildNullFrameObj(cid, keepAlive) {
   return {
-    cid,
+    channelId: cid,
     id: 0,
-    data: null
+    data: buildFrameBuffer(Buffer.allocUnsafe(0), cid),
+    length: 0,
+    keepAlive
   };
 }
-function slice(data, cid, maxPackSize = 1024) {
+function buildFrameBuffer(chunk, cid) {
+  const buffer = Buffer.allocUnsafe(chunk.length + MetaSize);
+  buffer.writeBigInt64LE(BigInt(cid), 0);
+  buffer.writeBigInt64LE(BigInt(chunk.length), 8);
+  buffer.set(chunk, MetaSize);
+  return escapeBuffer(buffer);
+}
+function parseFrameBuffer(frame) {
+  const buffer = unescapeBuffer(frame);
+  const cid = Number(buffer.readBigInt64LE(0));
+  const length = Number(buffer.readBigInt64LE(8));
+  const data = buffer.subarray(16, 16 + length);
+  return {
+    channelId: cid,
+    length,
+    id: 0,
+    data
+  };
+}
+function slice(data, cid) {
   const packs = [];
   let index = 0;
   let offset = 0;
   while (offset < data.length) {
+    const dataSlice = data.subarray(offset, offset + DataSegmentSize);
     const pack = {
-      cid,
+      channelId: cid,
       id: index,
-      data: data.subarray(offset, offset + maxPackSize).toString("base64")
+      data: buildFrameBuffer(dataSlice, cid),
+      length: dataSlice.length
     };
     packs.push(pack);
-    offset += maxPackSize;
+    offset += DataSegmentSize;
     ++index;
   }
   return packs;
 }
-
-// src/utils/random.ts
-function getNextRandomToken() {
-  return Math.random().toString(36).substring(2).padStart(12, "0");
-}
+var ReadFrameParser = class extends import_stream.Transform {
+  buffer = Buffer.alloc(0);
+  constructor() {
+    super();
+  }
+  _transform(chunk, encoding, callback) {
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    while (true) {
+      const frameStartIndex = this.buffer.indexOf(FrameBeg);
+      if (frameStartIndex === -1)
+        break;
+      const frameEndIndex = this.buffer.indexOf(FrameEnd, frameStartIndex + 1);
+      if (frameEndIndex === -1)
+        break;
+      const frameSize = frameEndIndex - frameStartIndex - 1;
+      if (frameSize < MetaSize) {
+        console.error("[Transformer]", "Frame dropped: wrong size.", frameSize);
+        this.buffer = this.buffer.subarray(frameStartIndex + 1);
+        continue;
+      }
+      const frame = this.buffer.subarray(frameStartIndex + 1, frameEndIndex);
+      this.push(frame);
+      this.buffer = this.buffer.subarray(frameEndIndex + 1);
+    }
+    callback();
+  }
+};
 
 // src/model/Channel.ts
-var Channel = class extends import_stream.Duplex {
+var Channel = class extends import_stream2.Duplex {
   _host;
   _id;
   _streamBufferIn;
   _finished = false;
+  _nullPack;
   get cid() {
     return this._id;
   }
@@ -68,8 +165,9 @@ var Channel = class extends import_stream.Duplex {
     this._host = host;
     this._id = id;
     this._streamBufferIn = [];
+    this._nullPack = buildNullFrameObj(this._id, true);
     this.once("finish", () => {
-      this._host.enqueueOut([getNullPack(this._id)]);
+      this._host.enqueueOut([this._nullPack]);
     });
   }
   _write(chunk, encoding, callback) {
@@ -102,7 +200,7 @@ var Channel = class extends import_stream.Duplex {
         this.push(buffer);
       } else {
         this._streamBufferIn.push(buffer);
-        console.log("C_DATA", buffer.length, "[QUEUE]");
+        console.warn("[Channel]", "EXT_DATA", buffer ? buffer.length : "[END]", "[QUEUED]");
       }
     }
   }
@@ -137,7 +235,6 @@ var ControllerChannel = class extends Channel {
     msg.tk = msg.tk || getNextRandomToken();
     let jsonMessage = JSON.stringify(msg);
     this._host.publishCtlMessage(jsonMessage);
-    console.log("\u53D1\u9001\u63A7\u5236\u6D88\u606F", msg, cb ? "[CALLBACK]" : "[NO-CALLBACK]");
     if (cb)
       this._cbQueue.set(msg.tk, cb);
   }
@@ -149,33 +246,29 @@ var ControllerChannel = class extends Channel {
       if (m.flag === 1 /* CALLBACK */) {
         const cb = this._cbQueue.get(m.tk);
         if (cb) {
-          console.log("\u6D88\u606F\u5904\u7406-\u56DE\u8C03", m);
           this._cbQueue.delete(m.tk);
           cb(m);
         }
       } else {
         try {
-          console.log("\u6D88\u606F\u5904\u7406-\u63A7\u5236", m);
           this.dispatchCtlMessage(m);
         } catch (e) {
-          console.log("\u6D88\u606F\u5904\u7406-\u63A7\u5236-\u9519\u8BEF", e, msg);
+          console.error("[Controller]", "Dispactching error:", e, msg);
         }
       }
     } catch (e) {
-      console.log("\u6D88\u606F\u5904\u7406-\u9519\u8BEF", e, msg);
+      console.error("\u6D88\u606F\u5904\u7406-\u9519\u8BEF", e, msg);
     }
   }
   dispatchCtlMessage(msg) {
     switch (msg.cmd) {
-      case "ESTABLISH": {
+      case "E" /* ESTABLISH */: {
         msg.data = this._channelManager.createChannel().cid;
         msg.flag = 1 /* CALLBACK */;
-        console.log(this._channelManager.name, "\u6D88\u606F\u5206\u53D1-\u5EFA\u7ACB\u96A7\u9053", msg, this._channelManager.getChannelCount());
         this.sendCtlMessage(msg);
         break;
       }
-      case "DISPOSE": {
-        console.log("\u6D88\u606F\u5206\u53D1-\u5173\u95ED\u96A7\u9053", msg);
+      case "D" /* DISPOSE */: {
         this._channelManager.deleteChannel(msg.data);
         break;
       }
@@ -221,7 +314,7 @@ var ChannelManager = class {
   constructor(host, name) {
     this._host = host;
     this._chnManName = name;
-    host.onPackReceived(this.dispatchPack.bind(this));
+    host.onFrameReceived(this.dispatchPack.bind(this));
     this._ctlChannel = new ControllerChannel(this._host, this);
   }
   getChannel(id) {
@@ -248,39 +341,36 @@ var ChannelManager = class {
   _host;
   async destroy() {
     this._host.destroy();
-    this._host.offPackReceived(this.dispatchPack);
+    this._host.offFrameReceived(this.dispatchPack);
     this._channels.forEach((chn) => chn?.destroy());
     this._channels.clear();
   }
   dispatchPack(pack) {
-    if (pack.cid === 0) {
-      const message = Buffer.from(pack.data, "base64").toString("utf8");
-      console.log("\u6536\u5230\u63A7\u5236\u6D88\u606F", message);
+    const { data, channelId, id } = pack;
+    if (channelId === 0) {
+      const message = data.toString("utf8");
       this._ctlChannel.processCtlMessageInternal(message);
       return;
     }
-    const channel = this.getChannel(pack.cid);
+    const channel = this.getChannel(channelId);
     if (!channel) {
-      console.log("DROP", pack.id, `Chn. <${pack.cid}> not found`);
+      console.warn("[ChnMan]", "Frame dropped: ", `Chn. <${channelId}> not found`);
       this.countDrop();
       return;
     }
     if (channel.destroyed) {
-      console.log("DROP", pack.id, `Chn. <${pack.cid}> destroyed`);
+      console.warn("[ChnMan]", "Frame dropped: ", `Chn. <${channelId}> destroyed`);
       this.countDrop();
       return;
     }
-    if (pack.data) {
-      channel.pushBufferExternal(Buffer.from(pack.data, "base64"));
+    if (data && data.length > 0) {
+      channel.pushBufferExternal(data);
     } else {
       channel.pushBufferExternal(null);
     }
     this.count();
   }
 };
-
-// src/model/PhysicalPortHost.ts
-var import_serialport = require("serialport");
 
 // src/utils/delay.ts
 async function delay(msTimeOut) {
@@ -293,19 +383,24 @@ var PhysicalPortHost = class {
   _queueOutgoing;
   _physical;
   _parser;
-  packEventList = /* @__PURE__ */ new Set();
+  frameEventList = /* @__PURE__ */ new Set();
   _isDestroyed = false;
   _isRunning = false;
   _isFinished = false;
+  _frameBeg = Buffer.from([FrameBeg]);
+  _frameEnd = Buffer.from([FrameEnd]);
   constructor(port) {
     this._physical = port;
     this._physical.on("error", console.error);
-    this._physical.on("close", () => console.log("CLOSED"));
+    this._physical.on("close", () => {
+      console.error("[PPH]", "Physical port closed unexpectedly.");
+      process.exit(1);
+    });
     this._queueIncoming = [];
     this._queueOutgoing = [];
-    this._parser = port.pipe(new import_serialport.ReadlineParser({ delimiter: "\r\n" }));
+    this._parser = port.pipe(new ReadFrameParser());
     this._parser.on("data", this.onReceivedInternal.bind(this));
-    console.log("Port opened.");
+    console.log("[PPH]", "Port opened: ", port.path, " @ ", port.baudRate);
   }
   async waitForFinish() {
     while (!this._isFinished) {
@@ -322,17 +417,21 @@ var PhysicalPortHost = class {
     if (this._isDestroyed || !this._isRunning) {
       throw new Error("Port is not running.");
     }
+    const cid = 0;
+    const buffer = Buffer.from(msg, "utf8");
+    const data = buildFrameBuffer(buffer, cid);
     this._queueOutgoing.unshift({
-      cid: 0,
+      channelId: cid,
       id: 0,
-      data: Buffer.from(msg, "utf8").toString("base64")
+      data,
+      length: buffer.length
     });
   }
-  onPackReceived(event) {
-    this.packEventList.add(event);
+  onFrameReceived(event) {
+    this.frameEventList.add(event);
   }
-  offPackReceived(event) {
-    this.packEventList.delete(event);
+  offFrameReceived(event) {
+    this.frameEventList.delete(event);
   }
   async start() {
     if (this._isDestroyed) {
@@ -354,18 +453,16 @@ var PhysicalPortHost = class {
     if (this._physical.isOpen)
       this._physical.close();
     this._parser.destroy();
-    this.packEventList.clear();
+    this.frameEventList.clear();
     this._queueIncoming.length = 0;
     this._queueOutgoing.length = 0;
   }
   onReceivedInternal(data) {
     try {
-      const pack = JSON.parse(data);
-      if (pack.cid === void 0)
-        return;
+      const pack = parseFrameBuffer(data);
       this._queueIncoming.push(pack);
     } catch (e) {
-      console.log("M_ERROR", e.message, data);
+      console.error("[PPH]", "M_ERROR", e.message, "\n", data.toString("hex"));
     }
   }
   async startSendingDequeueTask() {
@@ -378,25 +475,25 @@ var PhysicalPortHost = class {
           continue;
         if (!this._physical)
           break;
-        const json = JSON.stringify(pack);
-        this._physical.write(json + "\r\n");
+        this._physical.write(Buffer.concat([this._frameBeg, pack.data, this._frameEnd]));
         await new Promise((res) => this._physical.drain(res));
+        if (!pack.keepAlive)
+          pack.data = null;
       }
     } catch (e) {
-      console.log(e.message);
+      console.error(e.message);
     }
     this._isFinished = true;
-    console.log("SENDING STOPPED");
   }
   emitPackReceived(pack) {
     return new Promise((resolve) => {
-      this.packEventList.forEach((event) => {
+      for (const cb of this.frameEventList) {
         try {
-          event(pack);
+          cb(pack);
         } catch (e) {
           console.error(e);
         }
-      });
+      }
       resolve();
     });
   }
@@ -407,9 +504,8 @@ var PhysicalPortHost = class {
         this.emitPackReceived(pack);
       }
     } catch (e) {
-      console.log(e.message);
+      console.error(e.message);
     }
-    console.log("RECEIVING STOPPED");
   }
   async blockDequeueIn() {
     while (this._queueIncoming.length === 0) {
@@ -430,9 +526,9 @@ var PhysicalPortHost = class {
 };
 
 // src/utils/serialportHelp.ts
-var import_serialport2 = require("serialport");
+var import_serialport = require("serialport");
 async function listSerialPorts() {
-  return await import_serialport2.SerialPort.list();
+  return await import_serialport.SerialPort.list();
 }
 async function openSerialPort(portName, baudRate) {
   if (portName.startsWith(".")) {
@@ -446,7 +542,7 @@ async function openSerialPort(portName, baudRate) {
   if (!baudRate)
     baudRate = 16e5;
   return new Promise((resolve, reject) => {
-    const port = new import_serialport2.SerialPort(
+    const port = new import_serialport.SerialPort(
       {
         path: portName,
         baudRate,
@@ -485,7 +581,7 @@ async function channel_test_server(portName) {
   const physicalPort = await openSerialPort(portName, 16e5);
   const host = new PhysicalPortHost(physicalPort);
   host.start();
-  const chnMan = new ChannelManager(host);
+  const chnMan = new ChannelManager(host, "svr");
   const chn1 = chnMan.createChannel();
   const fileStream = fs.createWriteStream("test.txt");
   chn1.pipe(fileStream);
@@ -498,7 +594,7 @@ async function channel_test_client(portName, file) {
   const physicalPort = await openSerialPort(portName, 16e5);
   const host = new PhysicalPortHost(physicalPort);
   host.start();
-  const chnMan = new ChannelManager(host);
+  const chnMan = new ChannelManager(host, "client");
   const chn1 = chnMan.createChannel();
   const fileStream = fs.createReadStream(file);
   console.log("Streaming...");
@@ -533,13 +629,12 @@ var ProxyServer = class {
       host: u.hostname
     };
     const onEstablished = (msg) => {
-      console.log("\u4EE3\u7406\u670D\u52A1\u5668-\u6536\u5230\u8BF7\u6C42\u53CD\u9988\uFF1A", msg);
       const { data: cid, tk } = msg;
       chn = this._chnManager.createChannel(cid);
-      console.log("\u4EE3\u7406\u670D\u52A1\u5668-\u96A7\u9053\u5EFA\u7ACB\u6210\u529F\uFF0C \u5C1D\u8BD5\u5EFA\u7ACBSocket\u94FE\u63A5", chn.cid);
+      console.log("[Channel/Socket]", "Connection established.", chn.cid);
       this._ctl.sendCtlMessage(
         {
-          cmd: "CONNECT",
+          cmd: "C" /* CONNECT */,
           tk,
           flag: 0 /* CONTROL */,
           data: { cid, opt }
@@ -554,17 +649,14 @@ var ProxyServer = class {
         console.log("ERROR", e);
         chn.push(null);
       });
-      sock.once("close", () => {
-        console.log("SOCKET CLOSE");
-        this._chnManager.deleteChannel(chn);
-      });
+      sock.once("close", () => this._chnManager.deleteChannel(chn));
       chn.pipe(sock);
       sock.pipe(chn);
     };
-    console.log("\u4EE3\u7406\u670D\u52A1\u5668-\u5C1D\u8BD5\u5EFA\u7ACB\u96A7\u9053...");
+    console.log("[Channel/Socket]", "Connecting", u.href, u.port);
     this._ctl.sendCtlMessage(
       {
-        cmd: "ESTABLISH",
+        cmd: "E" /* ESTABLISH */,
         tk: null,
         flag: 0 /* CONTROL */
       },
@@ -582,13 +674,12 @@ var ProxyServer = class {
       headers: req.headers
     };
     const onEstablished = (msg) => {
-      console.log("\u4EE3\u7406\u670D\u52A1\u5668-\u6536\u5230\u8BF7\u6C42\u53CD\u9988\uFF1A", msg);
       const { data: cid, tk } = msg;
       chn = this._chnManager.createChannel(cid);
-      console.log("\u4EE3\u7406\u670D\u52A1\u5668-\u96A7\u9053\u5EFA\u7ACB\u6210\u529F\uFF0C \u5C1D\u8BD5\u5EFA\u7ACB\u8BF7\u6C42", chn.cid);
+      console.log("[Channel/Request]", "Connection established.", chn.cid);
       this._ctl.sendCtlMessage(
         {
-          cmd: "REQUEST",
+          cmd: "R" /* REQUEST */,
           tk,
           flag: 0 /* CONTROL */,
           data: { cid, opt }
@@ -596,24 +687,23 @@ var ProxyServer = class {
         null
       );
       chn.on("error", (e) => {
-        console.log("ERROR", e);
+        console.error("ERROR", e);
         res.end();
       });
       res.on("error", (e) => {
-        console.log("ERROR", e);
+        console.error("ERROR", e);
         chn.push(null);
       });
       res.once("close", () => {
-        console.log("SOCKET CLOSE");
         this._chnManager.deleteChannel(chn);
       });
       chn.pipe(res);
       req.pipe(chn);
     };
-    console.log("\u4EE3\u7406\u670D\u52A1\u5668-\u5C1D\u8BD5\u5EFA\u7ACB\u96A7\u9053...");
+    console.log("[Channel/Request]", "Connecting", u.href, u.port);
     this._ctl.sendCtlMessage(
       {
-        cmd: "ESTABLISH",
+        cmd: "E" /* ESTABLISH */,
         tk: null,
         flag: 0 /* CONTROL */
       },
@@ -630,10 +720,10 @@ var ProxyServer = class {
 function printUsage() {
   console.log(`Usage: node ${process.argv[1]} <command> [options]`);
   console.log("General options:");
-  console.log(`  --serialPort, -s <path>`);
+  console.log(`  --serial-port, -s <path>`);
   console.log(`    Specify the serial port to connect.`);
   console.log(`    Default: . (Use the first available port)`);
-  console.log(`  --baudRate, -b <baudRate>`);
+  console.log(`  --baud-rate, -b <baudRate>`);
   console.log(`    Specify the baud rate.`);
   console.log(`    Default: 1600000`);
   console.log(``);
@@ -683,21 +773,23 @@ function getOption(name, alias, defaultValue) {
 // src/service/request.ts
 var import_https = require("https");
 var import_net = require("net");
-function redirectRequestToChn(reqInfo, chn) {
+function redirectRequestToChn(reqInfo, chn, onClose) {
   const pReq = (0, import_https.request)(reqInfo, function(pRes) {
     pRes.pipe(chn);
+    console.log("[ProxyEndPoint/Request]", "Connected", chn.cid);
   }).on("error", function(e) {
     console.log("ERROR", import_https.request, e);
     chn.push(null);
   });
   chn.pipe(pReq);
+  pReq.once("close", onClose);
 }
 function redirectConnectToChn(reqInfo, chn, onClose) {
   const socket = (0, import_net.connect)(reqInfo, function() {
-    console.log("\u4EE3\u7406\u7AEF\u70B9-Socket\u94FE\u63A5\u5DF2\u5EFA\u7ACB", reqInfo);
     chn.write(Buffer.from("HTTP/1.1 200 Connection established\r\n\r\n"));
     socket.pipe(chn);
     chn.pipe(socket);
+    console.log("[ProxyEndPoint/Socket]", "Connected", chn.cid);
   }).on("error", function(e) {
     console.log("ERROR", reqInfo, e);
     chn.push(null);
@@ -717,27 +809,32 @@ var ProxyEndPoint = class {
   }
   onCtlMessageReceived(msg) {
     switch (msg.cmd) {
-      case "REQUEST": {
-        const { cid, opt } = msg.data;
-        console.log(this._channelManager.name, "\u4EE3\u7406\u7AEF\u70B9-\u63A5\u6536\u63A7\u5236\u6D88\u606F-REQUEST", cid, opt);
-        const channel = this._channelManager.getChannel(cid);
-        if (channel) {
-          redirectRequestToChn(opt, channel);
-          channel.once("finish", () => this._channelManager.deleteChannel(channel));
-        }
-        break;
-      }
-      case "CONNECT": {
+      case "C" /* CONNECT */: {
         const { cid, opt } = msg.data;
         const channel = this._channelManager.getChannel(cid);
-        console.log("\u4EE3\u7406\u7AEF\u70B9-\u63A5\u6536\u63A7\u5236\u6D88\u606F-CONNECT", cid, opt);
+        console.log("[ProxyEndPoint/Socket]", "Connecting", cid, opt);
         if (channel) {
           redirectConnectToChn(opt, channel, () => {
-            console.log("\u4EE3\u7406\u7AEF\u70B9-\u7BA1\u9053\u5173\u95ED-\u96A7\u9053\u5373\u5C06\u5173\u95ED", cid);
+            console.log("[ProxyEndPoint/Socket]", "Channel is closing.", cid);
             this._channelManager.deleteChannel(channel);
           });
         } else {
-          console.log("\u4EE3\u7406\u7AEF\u70B9-\u63A5\u6536\u63A7\u5236\u6D88\u606F-CONNECT", "\u4FE1\u9053\u4E0D\u5B58\u5728", cid);
+          console.log("[ProxyEndPoint/Socket]", "Channel not found:", cid);
+        }
+        break;
+      }
+      case "R" /* REQUEST */: {
+        const { cid, opt } = msg.data;
+        console.log("[ProxyEndPoint/Request]", "Connecting", cid, opt);
+        const channel = this._channelManager.getChannel(cid);
+        if (channel) {
+          redirectRequestToChn(opt, channel, () => {
+            console.log("[ProxyEndPoint/Request]", "Channel is closing.", cid);
+            this._channelManager.deleteChannel(channel);
+          });
+          channel.once("finish", () => this._channelManager.deleteChannel(channel));
+        } else {
+          console.log("[ProxyEndPoint/Request]", "Channel not found:", cid);
         }
         break;
       }
