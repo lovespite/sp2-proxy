@@ -25,7 +25,7 @@ async function channel_test_server(portName: string) {
   const host = new PhysicalPortHost(physicalPort);
   host.start();
 
-  const chnMan = new ChannelManager(host);
+  const chnMan = new ChannelManager(host, "svr");
   const chn1 = chnMan.createChannel();
 
   const fileStream = fs.createWriteStream("test.txt");
@@ -47,7 +47,7 @@ async function channel_test_client(portName: string, file: string) {
 
   host.start();
 
-  const chnMan = new ChannelManager(host);
+  const chnMan = new ChannelManager(host, "client");
 
   const chn1 = chnMan.createChannel();
 

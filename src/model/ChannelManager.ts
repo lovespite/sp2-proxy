@@ -1,4 +1,4 @@
-import { DataPack } from "./DataPack";
+import { Frame } from "./Frame";
 import { PhysicalPortHost } from "./PhysicalPortHost";
 import { Channel, ControllerChannel } from "./Channel";
 
@@ -47,7 +47,7 @@ export class ChannelManager {
   constructor(host: PhysicalPortHost, name: string) {
     this._host = host;
     this._chnManName = name;
-    host.onPackReceived(this.dispatchPack.bind(this));
+    host.onFrameReceived(this.dispatchPack.bind(this));
     this._ctlChannel = new ControllerChannel(this._host, this);
   }
 
@@ -82,38 +82,38 @@ export class ChannelManager {
 
   public async destroy() {
     this._host.destroy();
-    this._host.offPackReceived(this.dispatchPack);
+    this._host.offFrameReceived(this.dispatchPack);
     this._channels.forEach(chn => chn?.destroy());
     this._channels.clear();
   }
 
-  private dispatchPack(pack: DataPack) {
-    if (pack.cid === 0) {
-      // controller message
-      const message = Buffer.from(pack.data, "base64").toString("utf8");
+  private dispatchPack(pack: Frame) {
+    const { data, channelId, id } = pack;
 
-      console.log("收到控制消息", message);
+    if (channelId === 0) {
+      // controller message
+      const message = data.toString("utf8");
       this._ctlChannel.processCtlMessageInternal(message);
 
       return;
     }
 
-    const channel = this.getChannel(pack.cid);
+    const channel = this.getChannel(channelId);
 
     if (!channel) {
-      console.log("DROP", pack.id, `Chn. <${pack.cid}> not found`);
+      console.warn("[ChnMan]", "Frame dropped: ", `Chn. <${channelId}> not found`);
       this.countDrop();
       return;
     }
 
     if (channel.destroyed) {
-      console.log("DROP", pack.id, `Chn. <${pack.cid}> destroyed`);
+      console.warn("[ChnMan]", "Frame dropped: ", `Chn. <${channelId}> destroyed`);
       this.countDrop();
       return;
     }
 
-    if (pack.data) {
-      channel.pushBufferExternal(Buffer.from(pack.data, "base64"));
+    if (data && data.length > 0) {
+      channel.pushBufferExternal(data);
     } else {
       channel.pushBufferExternal(null);
     }

@@ -1,3 +1,9 @@
+let counter = 0;
+
+function getNextCount() {
+  return counter++;
+}
+
 export default function getNextRandomToken() {
-  return Math.random().toString(36).substring(2).padStart(12, "0");
+  return getNextCount().toString(36);
 }

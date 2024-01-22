@@ -1,15 +1,21 @@
 import { Duplex } from "stream";
-import { DataPack, getNullPack, slice } from "./DataPack";
+import { Frame } from "./Frame";
 import { PhysicalPortHost } from "./PhysicalPortHost";
 import { ChannelManager } from "./ChannelManager";
 import getNextRandomToken from "../utils/random";
+import { buildNullFrameObj, slice } from "../utils/frame";
 
 export enum CtlMessageFlag {
   CONTROL = 0,
   CALLBACK = 1,
 }
 
-type CtlMessageCommand = "ESTABLISH" | "DISPOSE" | "REQUEST" | "CONNECT";
+export enum CtlMessageCommand {
+  ESTABLISH = "E",
+  DISPOSE = "D",
+  CONNECT = "C",
+  REQUEST = "R",
+}
 
 export type ControlMessage = {
   tk: string | null;
@@ -29,6 +35,8 @@ export class Channel extends Duplex {
 
   private _finished: boolean = false;
 
+  private readonly _nullPack: Frame;
+
   public get cid() {
     return this._id;
   }
@@ -38,14 +46,15 @@ export class Channel extends Duplex {
     this._host = host;
     this._id = id;
     this._streamBufferIn = [];
+    this._nullPack = buildNullFrameObj(this._id, true);
 
     this.once("finish", () => {
-      this._host.enqueueOut([getNullPack(this._id)]);
+      this._host.enqueueOut([this._nullPack]);
     });
   }
 
   _write(chunk: any, encoding: BufferEncoding, callback: (error?: Error) => void): void {
-    let packs: DataPack[];
+    let packs: Frame[];
 
     if (chunk instanceof Buffer) {
       packs = slice(chunk, this._id);
@@ -80,7 +89,7 @@ export class Channel extends Duplex {
       } else {
         // 如果队列中有待处理数据，先入队
         this._streamBufferIn.push(buffer); // 入队
-        console.log("C_DATA", buffer.length, "[QUEUE]");
+        console.warn("[Channel]", "EXT_DATA", buffer ? buffer.length : "[END]", "[QUEUED]");
       }
     }
   }
@@ -123,8 +132,6 @@ export class ControllerChannel extends Channel {
     let jsonMessage = JSON.stringify(msg);
 
     this._host.publishCtlMessage(jsonMessage);
-
-    console.log("发送控制消息", msg, cb ? "[CALLBACK]" : "[NO-CALLBACK]");
     if (cb) this._cbQueue.set(msg.tk, cb);
   }
 
@@ -138,37 +145,35 @@ export class ControllerChannel extends Channel {
         const cb = this._cbQueue.get(m.tk);
         // 回调消息
         if (cb) {
-          console.log("消息处理-回调", m);
           this._cbQueue.delete(m.tk);
           cb(m);
         }
       } else {
         // 控制消息
         try {
-          console.log("消息处理-控制", m);
           this.dispatchCtlMessage(m);
         } catch (e) {
-          console.log("消息处理-控制-错误", e, msg);
+          console.error("[Controller]", "Dispactching error:", e, msg);
         }
       }
     } catch (e) {
-      console.log("消息处理-错误", e, msg);
+      console.error("消息处理-错误", e, msg);
     }
   }
 
   private dispatchCtlMessage(msg: ControlMessage) {
     switch (msg.cmd) {
-      case "ESTABLISH": {
+      case CtlMessageCommand.ESTABLISH: {
         //remote client want to establish a new channel
         msg.data = this._channelManager.createChannel().cid;
         msg.flag = CtlMessageFlag.CALLBACK;
-        console.log(this._channelManager.name, "消息分发-建立隧道", msg, this._channelManager.getChannelCount());
+
         this.sendCtlMessage(msg);
         break;
       }
-      case "DISPOSE": {
+      case CtlMessageCommand.DISPOSE: {
         //remote client want to close a channel
-        console.log("消息分发-关闭隧道", msg);
+
         this._channelManager.deleteChannel(msg.data);
         break;
       }

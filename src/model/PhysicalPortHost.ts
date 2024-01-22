@@ -1,33 +1,41 @@
-import { ReadlineParser, SerialPort } from "serialport";
-import { DataPack } from "./DataPack";
+import { SerialPort } from "serialport";
+import { Frame } from "./Frame";
 import delay from "../utils/delay";
+import { FrameBeg, FrameEnd, ReadFrameParser, buildFrameBuffer, parseFrameBuffer, printBuffer } from "../utils/frame";
+import { Transform } from "stream";
 
-type onPackReceivedEvent = (pack: DataPack) => void;
+type OnFrameReceivedEvent = (pack: Frame) => void;
 
 export class PhysicalPortHost {
-  private readonly _queueIncoming: DataPack[];
-  private readonly _queueOutgoing: DataPack[];
+  private readonly _queueIncoming: Frame[];
+  private readonly _queueOutgoing: Frame[];
 
   private readonly _physical: SerialPort;
-  private readonly _parser: ReadlineParser;
-  private readonly packEventList: Set<onPackReceivedEvent> = new Set();
+  private readonly _parser: Transform;
+  private readonly frameEventList: Set<OnFrameReceivedEvent> = new Set();
 
   private _isDestroyed: boolean = false;
   private _isRunning: boolean = false;
   private _isFinished: boolean = false;
 
+  private readonly _frameBeg: Buffer = Buffer.from([FrameBeg]);
+  private readonly _frameEnd: Buffer = Buffer.from([FrameEnd]);
+
   constructor(port: SerialPort) {
     this._physical = port;
     this._physical.on("error", console.error);
-    this._physical.on("close", () => console.log("CLOSED"));
+    this._physical.on("close", () => {
+      console.error("[PPH]", "Physical port closed unexpectedly.");
+      process.exit(1);
+    });
 
     this._queueIncoming = [];
     this._queueOutgoing = [];
 
-    this._parser = port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
+    this._parser = port.pipe(new ReadFrameParser());
     this._parser.on("data", this.onReceivedInternal.bind(this));
 
-    console.log("Port opened.");
+    console.log("[PPH]", "Port opened: ", port.path, " @ ", port.baudRate);
   }
 
   public async waitForFinish() {
@@ -36,7 +44,7 @@ export class PhysicalPortHost {
     }
   }
 
-  public enqueueOut(packs: DataPack[]) {
+  public enqueueOut(packs: Frame[]) {
     if (this._isDestroyed || !this._isRunning) {
       throw new Error("Port is not running.");
     }
@@ -49,19 +57,26 @@ export class PhysicalPortHost {
       throw new Error("Port is not running.");
     }
 
+    const cid = 0;
+    const buffer = Buffer.from(msg, "utf8");
+
+    const data = buildFrameBuffer(buffer, cid);
+
+    // high priority
     this._queueOutgoing.unshift({
-      cid: 0,
+      channelId: cid,
       id: 0,
-      data: Buffer.from(msg, "utf8").toString("base64"),
-    }); // the highest priority
+      data,
+      length: buffer.length,
+    });
   }
 
-  public onPackReceived(event: onPackReceivedEvent) {
-    this.packEventList.add(event);
+  public onFrameReceived(event: OnFrameReceivedEvent) {
+    this.frameEventList.add(event);
   }
 
-  public offPackReceived(event: onPackReceivedEvent) {
-    this.packEventList.delete(event);
+  public offFrameReceived(event: OnFrameReceivedEvent) {
+    this.frameEventList.delete(event);
   }
 
   public async start() {
@@ -87,19 +102,17 @@ export class PhysicalPortHost {
     await this.stop();
     if (this._physical.isOpen) this._physical.close();
     this._parser.destroy();
-    this.packEventList.clear();
+    this.frameEventList.clear();
     this._queueIncoming.length = 0;
     this._queueOutgoing.length = 0;
   }
 
-  private onReceivedInternal(data: string) {
+  private onReceivedInternal(data: Buffer) {
     try {
-      const pack: DataPack = JSON.parse(data);
-      if (pack.cid === undefined) return;
-
+      const pack = parseFrameBuffer(data);
       this._queueIncoming.push(pack);
     } catch (e) {
-      console.log("M_ERROR", e.message, data);
+      console.error("[PPH]", "M_ERROR", e.message, "\n", data.toString("hex"));
     }
   }
 
@@ -112,33 +125,33 @@ export class PhysicalPortHost {
 
         if (!this._physical) break;
 
-        const json = JSON.stringify(pack);
+        this._physical.write(Buffer.concat([this._frameBeg, pack.data, this._frameEnd]));
 
-        this._physical.write(json + "\r\n");
         await new Promise(res => this._physical.drain(res));
-
-        // if (pack.data) {
-        //   console.log("SENT", pack.cid, pack.id, json.length);
-        // } else {
-        //   console.log("SENT", pack.cid, pack.id, "[END]");
-        // }
+        if (!pack.keepAlive) pack.data = null; // release memory
       }
     } catch (e) {
-      console.log(e.message);
+      console.error(e.message);
     }
     this._isFinished = true;
-    console.log("SENDING STOPPED");
   }
 
-  private emitPackReceived(pack: DataPack) {
+  private emitPackReceived(pack: Frame) {
     return new Promise<void>(resolve => {
-      this.packEventList.forEach((event): void => {
+      // this.packEventList.forEach((event): void => {
+      //   try {
+      //     event(pack);
+      //   } catch (e) {
+      //     console.error(e);
+      //   }
+      // });
+      for (const cb of this.frameEventList) {
         try {
-          event(pack);
+          cb(pack);
         } catch (e) {
           console.error(e);
         }
-      });
+      }
       resolve();
     });
   }
@@ -151,12 +164,11 @@ export class PhysicalPortHost {
         this.emitPackReceived(pack);
       }
     } catch (e) {
-      console.log(e.message);
+      console.error(e.message);
     }
-    console.log("RECEIVING STOPPED");
   }
 
-  private async blockDequeueIn(): Promise<DataPack> {
+  private async blockDequeueIn(): Promise<Frame> {
     while (this._queueIncoming.length === 0) {
       await delay(100);
       if (!this._isRunning) throw new Error("Port stopped.");
@@ -164,7 +176,7 @@ export class PhysicalPortHost {
     return this._queueIncoming.shift();
   }
 
-  private async blockDequeueOut(): Promise<DataPack | undefined> {
+  private async blockDequeueOut(): Promise<Frame | undefined> {
     while (this._queueOutgoing.length === 0) {
       await delay(100);
       if (!this._isRunning) return;

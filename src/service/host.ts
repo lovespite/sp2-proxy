@@ -4,7 +4,7 @@ import internal from "stream";
 import { SerialPort } from "serialport";
 import { PhysicalPortHost } from "../model/PhysicalPortHost";
 import { ChannelManager } from "../model/ChannelManager";
-import { Channel, ControllerChannel, CtlMessageFlag } from "../model/Channel";
+import { Channel, ControllerChannel, CtlMessageCommand, CtlMessageFlag } from "../model/Channel";
 
 // function request(cReq: IncomingMessage, cRes: ServerResponse) {
 //   const u = new URL(cReq.url);
@@ -80,14 +80,13 @@ export class ProxyServer {
     };
 
     const onEstablished = (msg: { data: number; tk: string }) => {
-      console.log("代理服务器-收到请求反馈：", msg);
       const { data: cid, tk } = msg;
 
       chn = this._chnManager.createChannel(cid);
-      console.log("代理服务器-隧道建立成功， 尝试建立Socket链接", chn.cid);
+      console.log("[Channel/Socket]", "Connection established.", chn.cid);
       this._ctl.sendCtlMessage(
         {
-          cmd: "CONNECT",
+          cmd: CtlMessageCommand.CONNECT,
           tk,
           flag: CtlMessageFlag.CONTROL,
           data: { cid, opt },
@@ -104,19 +103,16 @@ export class ProxyServer {
         chn.push(null);
       });
 
-      sock.once("close", () => {
-        console.log("SOCKET CLOSE");
-        this._chnManager.deleteChannel(chn);
-      });
+      sock.once("close", () => this._chnManager.deleteChannel(chn));
 
       chn.pipe(sock);
       sock.pipe(chn);
     };
 
-    console.log("代理服务器-尝试建立隧道...");
+    console.log("[Channel/Socket]", "Connecting", u.href, u.port);
     this._ctl.sendCtlMessage(
       {
-        cmd: "ESTABLISH",
+        cmd: CtlMessageCommand.ESTABLISH,
         tk: null,
         flag: CtlMessageFlag.CONTROL,
       },
@@ -137,14 +133,14 @@ export class ProxyServer {
     };
 
     const onEstablished = (msg: { data: number; tk: string }) => {
-      console.log("代理服务器-收到请求反馈：", msg);
       const { data: cid, tk } = msg;
 
       chn = this._chnManager.createChannel(cid);
-      console.log("代理服务器-隧道建立成功， 尝试建立请求", chn.cid);
+
+      console.log("[Channel/Request]", "Connection established.", chn.cid);
       this._ctl.sendCtlMessage(
         {
-          cmd: "REQUEST",
+          cmd: CtlMessageCommand.REQUEST,
           tk,
           flag: CtlMessageFlag.CONTROL,
           data: { cid, opt },
@@ -153,15 +149,14 @@ export class ProxyServer {
       );
 
       chn.on("error", (e: any) => {
-        console.log("ERROR", e);
+        console.error("ERROR", e);
         res.end();
       });
       res.on("error", e => {
-        console.log("ERROR", e);
+        console.error("ERROR", e);
         chn.push(null);
       });
       res.once("close", () => {
-        console.log("SOCKET CLOSE");
         this._chnManager.deleteChannel(chn);
       });
 
@@ -169,10 +164,10 @@ export class ProxyServer {
       req.pipe(chn);
     };
 
-    console.log("代理服务器-尝试建立隧道...");
+    console.log("[Channel/Request]", "Connecting", u.href, u.port);
     this._ctl.sendCtlMessage(
       {
-        cmd: "ESTABLISH",
+        cmd: CtlMessageCommand.ESTABLISH,
         tk: null,
         flag: CtlMessageFlag.CONTROL,
       },
