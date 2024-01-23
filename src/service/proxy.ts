@@ -1,5 +1,5 @@
 import { ChannelManager } from "../model/ChannelManager";
-import { PhysicalPortHost } from "../model/PhysicalPortHost";
+import { PhysicalPort } from "../model/PhysicalPort";
 import { ControlMessage, CtlMessageCommand } from "../model/Channel";
 import { RequestOptions } from "http";
 import { NetConnectOpts } from "net";
@@ -8,13 +8,14 @@ import { ProxyOptions } from "./host";
 
 export default class ProxyEndPoint {
   private readonly _options: ProxyOptions;
-  private readonly _host: PhysicalPortHost;
+  private readonly _hosts: PhysicalPort[];
   private readonly _channelManager: ChannelManager;
 
   constructor(options: ProxyOptions) {
     this._options = options;
-    this._host = new PhysicalPortHost(this._options.serialPort);
-    this._channelManager = new ChannelManager(this._host, "ProxyEndPoint");
+    this._hosts = options.serialPorts.map(port => new PhysicalPort(port));
+    this._channelManager = new ChannelManager(this._hosts[0], "ProxyEndPoint");
+    this._channelManager.bindHosts(this._hosts.slice(1));
   }
 
   private onCtlMessageReceived(msg: ControlMessage) {
@@ -64,6 +65,6 @@ export default class ProxyEndPoint {
     const ctl = this._channelManager.ctlChannel;
 
     ctl.onCtlMessageReceived(this.onCtlMessageReceived.bind(this));
-    await this._host.start();
+    await Promise.all(this._hosts.map(host => host.start()));
   }
 }

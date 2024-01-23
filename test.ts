@@ -1,5 +1,5 @@
 import { ChannelManager } from "./src/model/ChannelManager.js";
-import { PhysicalPortHost } from "./src/model/PhysicalPortHost.js";
+import { PhysicalPort } from "./src/model/PhysicalPort.js";
 import { MaxTransmitionUnitSize, constructTestBuffer, testEscapeBuffer } from "./src/utils/frame.js";
 import { openSerialPort } from "./src/utils/serialportHelp.js";
 import * as fs from "fs";
@@ -31,7 +31,7 @@ export default async function test(args: [string, string][]) {
 
 async function channel_test_server(portName: string) {
   const physicalPort = await openSerialPort(portName, 1_600_000);
-  const host = new PhysicalPortHost(physicalPort);
+  const host = new PhysicalPort(physicalPort);
   host.start();
 
   const chnMan = new ChannelManager(host, "svr");
@@ -52,7 +52,7 @@ async function channel_test_server(portName: string) {
 
 async function channel_test_client(portName: string, file: string) {
   const physicalPort = await openSerialPort(portName, 1_600_000);
-  const host = new PhysicalPortHost(physicalPort);
+  const host = new PhysicalPort(physicalPort);
 
   host.start();
 

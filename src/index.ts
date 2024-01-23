@@ -8,9 +8,15 @@ import ProxyEndPoint from "./service/proxy";
 
 async function main() {
   opt.parse(process.argv.slice(2));
-  const serialPortName: string = opt.getOption("serial-port", "s", ".");
+
+  const serialPortName: string[] = opt
+    .getOption("serial-port", "s", ".")
+    .split(",")
+    .map(s => s.trim());
+
   const baudRate: number = parseInt(opt.getOption("baud-rate", "b", "1600000"));
-  let serialPort: SerialPort;
+
+  let serialPorts: SerialPort[];
   let opts: ProxyOptions;
 
   const cmd = opt.getCommand();
@@ -32,14 +38,14 @@ async function main() {
         .catch(err => console.error(err));
       break;
     case "proxy":
-      serialPort = await openSerialPort(serialPortName, baudRate);
-      opts = { serialPort };
+      serialPorts = await Promise.all(serialPortName.map(async name => await openSerialPort(name, baudRate)));
+      opts = { serialPorts };
       await new ProxyEndPoint(opts).proxy();
       break;
     case "host":
-      serialPort = await openSerialPort(serialPortName, baudRate);
+      serialPorts = await Promise.all(serialPortName.map(async name => await openSerialPort(name, baudRate)));
       opts = {
-        serialPort,
+        serialPorts,
         port: parseInt(opt.getOption("port", "p", "13808")),
         listen: opt.getOption("listen", "l", "0.0.0.0"),
       };

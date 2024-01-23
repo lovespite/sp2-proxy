@@ -7,7 +7,7 @@ import { Transform } from "stream";
 
 type OnFrameReceivedEvent = (pack: Frame) => void;
 
-export class PhysicalPortHost {
+export class PhysicalPort {
   private readonly _queueIncoming: Frame[];
   private readonly _queueOutgoing: Frame[];
 
@@ -21,6 +21,10 @@ export class PhysicalPortHost {
 
   private readonly _frameBeg: Buffer = Buffer.from([FrameBeg]);
   private readonly _frameEnd: Buffer = Buffer.from([FrameEnd]);
+
+  public get backPressure() {
+    return this._queueOutgoing.length;
+  }
 
   constructor(port: SerialPort) {
     this._physical = port;
@@ -138,13 +142,6 @@ export class PhysicalPortHost {
 
   private emitPackReceived(pack: Frame) {
     return new Promise<void>(resolve => {
-      // this.packEventList.forEach((event): void => {
-      //   try {
-      //     event(pack);
-      //   } catch (e) {
-      //     console.error(e);
-      //   }
-      // });
       for (const cb of this.frameEventList) {
         try {
           cb(pack);

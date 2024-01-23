@@ -1,6 +1,6 @@
 import { Duplex } from "stream";
 import { Frame } from "./Frame";
-import { PhysicalPortHost } from "./PhysicalPortHost";
+import { PhysicalPort } from "./PhysicalPort";
 import { ChannelManager } from "./ChannelManager";
 import getNextRandomToken from "../utils/random";
 import { buildNullFrameObj, slice } from "../utils/frame";
@@ -29,7 +29,7 @@ export type CtlMessageSendBackDelegate = (mToSend: ControlMessage) => void;
 export type CtlMessageHandler = (mReceived: ControlMessage, sendBack: CtlMessageSendBackDelegate) => void;
 
 export class Channel extends Duplex {
-  protected readonly _host: PhysicalPortHost;
+  protected readonly _host: PhysicalPort;
   private readonly _id: number;
   private readonly _streamBufferIn: any[];
 
@@ -41,7 +41,7 @@ export class Channel extends Duplex {
     return this._id;
   }
 
-  constructor(id: number, host: PhysicalPortHost) {
+  constructor(id: number, host: PhysicalPort) {
     super();
     this._host = host;
     this._id = id;
@@ -109,7 +109,7 @@ export class ControllerChannel extends Channel {
   private readonly _ctlMsgHandlers: Set<CtlMessageHandler> = new Set();
 
   private readonly _channelManager: ChannelManager;
-  constructor(host: PhysicalPortHost, man: ChannelManager) {
+  constructor(host: PhysicalPort, man: ChannelManager) {
     super(0, host);
     this._channelManager = man;
   }

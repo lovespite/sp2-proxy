@@ -1,9 +1,28 @@
 import { Frame } from "./Frame";
-import { PhysicalPortHost } from "./PhysicalPortHost";
+import { PhysicalPort } from "./PhysicalPort";
 import { Channel, ControllerChannel } from "./Channel";
 
 export class ChannelManager {
   private _cid: number = 1;
+
+  private readonly _hosts: PhysicalPort[] = [];
+
+  private get primaryHost() {
+    return this._hosts[0];
+  }
+
+  private get bestHost() {
+    if (this._hosts.length === 1) {
+      return this.primaryHost;
+    }
+
+    // get the lowest back pressure host
+    const map = this._hosts
+      .map(host => ({ host, backPressure: host.backPressure }))
+      .sort((a, b) => a.backPressure - b.backPressure);
+
+    return map[0].host;
+  }
 
   private getNextCid() {
     return this._cid++;
@@ -44,11 +63,17 @@ export class ChannelManager {
     return this.name;
   }
 
-  constructor(host: PhysicalPortHost, name: string) {
-    this._host = host;
+  constructor(primaryHost: PhysicalPort, name: string) {
     this._chnManName = name;
-    host.onFrameReceived(this.dispatchFrame.bind(this));
-    this._ctlChannel = new ControllerChannel(this._host, this);
+    this._ctlChannel = new ControllerChannel(primaryHost, this);
+    this.bindHosts([primaryHost]);
+  }
+
+  public bindHosts(hosts: PhysicalPort[]) {
+    this._hosts.push(...hosts);
+    for (const host of hosts) {
+      host.onFrameReceived(this.dispatchFrame.bind(this));
+    }
   }
 
   public getChannel(id: number): Channel | undefined {
@@ -69,7 +94,7 @@ export class ChannelManager {
 
   public createChannel(id?: number) {
     const cid = id || this.getNextCid();
-    const channel = new Channel(cid, this._host);
+    const channel = new Channel(cid, this.bestHost);
     this._channels.set(cid, channel);
     return channel;
   }
@@ -78,11 +103,9 @@ export class ChannelManager {
     this._channels.delete(chn.cid);
   }
 
-  private readonly _host: PhysicalPortHost;
-
   public async destroy() {
-    this._host.destroy();
-    this._host.offFrameReceived(this.dispatchFrame);
+    this.primaryHost.destroy();
+    this.primaryHost.offFrameReceived(this.dispatchFrame);
     this._channels.forEach(chn => chn?.destroy());
     this._channels.clear();
   }

@@ -22,7 +22,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // src/model/Channel.ts
-var import_stream2 = require("stream");
+var import_stream = require("stream");
 
 // src/utils/random.ts
 var counter = 0;
@@ -34,7 +34,6 @@ function getNextRandomToken() {
 }
 
 // src/utils/frame.ts
-var import_stream = require("stream");
 var MetaSize = 16;
 var MaxTransmitionUnitSize = 1500;
 var EscapeChar = 16;
@@ -218,36 +217,9 @@ function slice(data, cid) {
   }
   return packs;
 }
-var ReadFrameParser = class extends import_stream.Transform {
-  buffer = Buffer.alloc(0);
-  constructor() {
-    super();
-  }
-  _transform(chunk, encoding, callback) {
-    this.buffer = Buffer.concat([this.buffer, chunk]);
-    while (true) {
-      const frameStartIndex = this.buffer.indexOf(FrameBeg);
-      if (frameStartIndex === -1)
-        break;
-      const frameEndIndex = this.buffer.indexOf(FrameEnd, frameStartIndex + 1);
-      if (frameEndIndex === -1)
-        break;
-      const frameSize = frameEndIndex - frameStartIndex - 1;
-      if (frameSize < MetaSize) {
-        console.error("[Transformer]", "Frame dropped: wrong size.", frameSize);
-        this.buffer = this.buffer.subarray(frameStartIndex + 1);
-        continue;
-      }
-      const frame = this.buffer.subarray(frameStartIndex + 1, frameEndIndex);
-      this.push(frame);
-      this.buffer = this.buffer.subarray(frameEndIndex + 1);
-    }
-    callback();
-  }
-};
 
 // src/model/Channel.ts
-var Channel = class extends import_stream2.Duplex {
+var Channel = class extends import_stream.Duplex {
   _host;
   _id;
   _streamBufferIn;
@@ -372,6 +344,17 @@ var ControllerChannel = class extends Channel {
 // src/model/ChannelManager.ts
 var ChannelManager = class {
   _cid = 1;
+  _hosts = [];
+  get primaryHost() {
+    return this._hosts[0];
+  }
+  get bestHost() {
+    if (this._hosts.length === 1) {
+      return this.primaryHost;
+    }
+    const map2 = this._hosts.map((host) => ({ host, backPressure: host.backPressure })).sort((a, b) => a.backPressure - b.backPressure);
+    return map2[0].host;
+  }
   getNextCid() {
     return this._cid++;
   }
@@ -401,11 +384,16 @@ var ChannelManager = class {
   toString() {
     return this.name;
   }
-  constructor(host, name) {
-    this._host = host;
+  constructor(primaryHost, name) {
     this._chnManName = name;
-    host.onFrameReceived(this.dispatchFrame.bind(this));
-    this._ctlChannel = new ControllerChannel(this._host, this);
+    this._ctlChannel = new ControllerChannel(primaryHost, this);
+    this.bindHosts([primaryHost]);
+  }
+  bindHosts(hosts) {
+    this._hosts.push(...hosts);
+    for (const host of hosts) {
+      host.onFrameReceived(this.dispatchFrame.bind(this));
+    }
   }
   getChannel(id) {
     return this._channels.get(id);
@@ -421,17 +409,16 @@ var ChannelManager = class {
   }
   createChannel(id) {
     const cid = id || this.getNextCid();
-    const channel = new Channel(cid, this._host);
+    const channel = new Channel(cid, this.bestHost);
     this._channels.set(cid, channel);
     return channel;
   }
   deleteChannel(chn) {
     this._channels.delete(chn.cid);
   }
-  _host;
   async destroy() {
-    this._host.destroy();
-    this._host.offFrameReceived(this.dispatchFrame);
+    this.primaryHost.destroy();
+    this.primaryHost.offFrameReceived(this.dispatchFrame);
     this._channels.forEach((chn) => chn?.destroy());
     this._channels.clear();
   }
@@ -467,8 +454,38 @@ async function delay(msTimeOut) {
   return new Promise((resolve) => setTimeout(resolve, msTimeOut));
 }
 
-// src/model/PhysicalPortHost.ts
-var PhysicalPortHost = class {
+// src/model/ReadFrameParser.ts
+var import_stream2 = require("stream");
+var ReadFrameParser = class extends import_stream2.Transform {
+  buffer = Buffer.alloc(0);
+  constructor() {
+    super();
+  }
+  _transform(chunk, encoding, callback) {
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    while (true) {
+      const frameStartIndex = this.buffer.indexOf(FrameBeg);
+      if (frameStartIndex === -1)
+        break;
+      const frameEndIndex = this.buffer.indexOf(FrameEnd, frameStartIndex + 1);
+      if (frameEndIndex === -1)
+        break;
+      const frameSize = frameEndIndex - frameStartIndex - 1;
+      if (frameSize < MetaSize) {
+        console.error("[Transformer]", "Frame dropped: wrong size.", frameSize);
+        this.buffer = this.buffer.subarray(frameStartIndex + 1);
+        continue;
+      }
+      const frame = this.buffer.subarray(frameStartIndex + 1, frameEndIndex);
+      this.push(frame);
+      this.buffer = this.buffer.subarray(frameEndIndex + 1);
+    }
+    callback();
+  }
+};
+
+// src/model/PhysicalPort.ts
+var PhysicalPort = class {
   _queueIncoming;
   _queueOutgoing;
   _physical;
@@ -479,6 +496,9 @@ var PhysicalPortHost = class {
   _isFinished = false;
   _frameBeg = Buffer.from([FrameBeg]);
   _frameEnd = Buffer.from([FrameEnd]);
+  get backPressure() {
+    return this._queueOutgoing.length;
+  }
   constructor(port) {
     this._physical = port;
     this._physical.on("error", console.error);
@@ -676,7 +696,7 @@ async function test(args2) {
 }
 async function channel_test_server(portName) {
   const physicalPort = await openSerialPort(portName, 16e5);
-  const host = new PhysicalPortHost(physicalPort);
+  const host = new PhysicalPort(physicalPort);
   host.start();
   const chnMan = new ChannelManager(host, "svr");
   const chn1 = chnMan.createChannel();
@@ -689,7 +709,7 @@ async function channel_test_server(portName) {
 }
 async function channel_test_client(portName, file) {
   const physicalPort = await openSerialPort(portName, 16e5);
-  const host = new PhysicalPortHost(physicalPort);
+  const host = new PhysicalPort(physicalPort);
   host.start();
   const chnMan = new ChannelManager(host, "client");
   const chn1 = chnMan.createChannel();
@@ -709,13 +729,14 @@ async function channel_test_client(portName, file) {
 var import_http = require("http");
 var ProxyServer = class {
   _options;
-  _host;
+  _hosts;
   _chnManager;
   _ctl;
   constructor(options) {
     this._options = options;
-    this._host = new PhysicalPortHost(this._options.serialPort);
-    this._chnManager = new ChannelManager(this._host, "ProxyServer");
+    this._hosts = options.serialPorts.map((port) => new PhysicalPort(port));
+    this._chnManager = new ChannelManager(this._hosts[0], "ProxyServer");
+    this._chnManager.bindHosts(this._hosts.slice(1));
     this._ctl = this._chnManager.ctlChannel;
   }
   connect(req, sock) {
@@ -808,7 +829,7 @@ var ProxyServer = class {
     );
   }
   listen() {
-    this._host.start();
+    this._hosts.forEach((host) => host.start());
     (0, import_http.createServer)().on("request", this.request.bind(this)).on("connect", this.connect.bind(this)).listen(this._options.port || 13808, this._options.listen || "0.0.0.0");
   }
 };
@@ -873,7 +894,7 @@ var import_net = require("net");
 function redirectRequestToChn(reqInfo, chn, onClose) {
   const pReq = (0, import_https.request)(reqInfo, function(pRes) {
     pRes.pipe(chn);
-    console.log("[ProxyEndPoint/Request]", "Connected", chn.cid);
+    console.log("[ProxyEndPoint/Request]", chn.cid, "Connected");
   }).on("error", function(e) {
     console.log("ERROR", import_https.request, e);
     chn.push(null);
@@ -886,7 +907,7 @@ function redirectConnectToChn(reqInfo, chn, onClose) {
     chn.write(Buffer.from("HTTP/1.1 200 Connection established\r\n\r\n"));
     socket.pipe(chn);
     chn.pipe(socket);
-    console.log("[ProxyEndPoint/Socket]", "Connected", chn.cid);
+    console.log("[ProxyEndPoint/Socket]", chn.cid, "Connected");
   }).on("error", function(e) {
     console.log("ERROR", reqInfo, e);
     chn.push(null);
@@ -897,26 +918,27 @@ function redirectConnectToChn(reqInfo, chn, onClose) {
 // src/service/proxy.ts
 var ProxyEndPoint = class {
   _options;
-  _host;
+  _hosts;
   _channelManager;
   constructor(options) {
     this._options = options;
-    this._host = new PhysicalPortHost(this._options.serialPort);
-    this._channelManager = new ChannelManager(this._host, "ProxyEndPoint");
+    this._hosts = options.serialPorts.map((port) => new PhysicalPort(port));
+    this._channelManager = new ChannelManager(this._hosts[0], "ProxyEndPoint");
+    this._channelManager.bindHosts(this._hosts.slice(1));
   }
   onCtlMessageReceived(msg) {
     switch (msg.cmd) {
       case "C" /* CONNECT */: {
         const { cid, opt } = msg.data;
         const channel = this._channelManager.getChannel(cid);
-        console.log("[ProxyEndPoint/Socket]", "Connecting", cid, opt);
+        console.log("[ProxyEndPoint/Socket]", cid, "Connecting", opt);
         if (channel) {
           redirectConnectToChn(opt, channel, () => {
             console.log("[ProxyEndPoint/Socket]", cid, "Channel is closing.");
             this._channelManager.deleteChannel(channel);
           });
         } else {
-          console.log("[ProxyEndPoint/Socket]", cid, "Channel not found:");
+          console.log("[ProxyEndPoint/Socket]", "Channel not found:", cid);
         }
         break;
       }
@@ -931,7 +953,7 @@ var ProxyEndPoint = class {
           });
           channel.once("finish", () => this._channelManager.deleteChannel(channel));
         } else {
-          console.log("[ProxyEndPoint/Request]", cid, "Channel not found:");
+          console.log("[ProxyEndPoint/Request]", "Channel not found:", cid);
         }
         break;
       }
@@ -940,16 +962,16 @@ var ProxyEndPoint = class {
   async proxy() {
     const ctl = this._channelManager.ctlChannel;
     ctl.onCtlMessageReceived(this.onCtlMessageReceived.bind(this));
-    await this._host.start();
+    await Promise.all(this._hosts.map((host) => host.start()));
   }
 };
 
 // src/index.ts
 async function main() {
   parse(process.argv.slice(2));
-  const serialPortName = getOption("serial-port", "s", ".");
+  const serialPortName = getOption("serial-port", "s", ".").split(",").map((s) => s.trim());
   const baudRate = parseInt(getOption("baud-rate", "b", "1600000"));
-  let serialPort;
+  let serialPorts;
   let opts;
   const cmd = getCommand();
   if (!cmd) {
@@ -967,14 +989,14 @@ async function main() {
       }).catch((err) => console.error(err));
       break;
     case "proxy":
-      serialPort = await openSerialPort(serialPortName, baudRate);
-      opts = { serialPort };
+      serialPorts = await Promise.all(serialPortName.map(async (name) => await openSerialPort(name, baudRate)));
+      opts = { serialPorts };
       await new ProxyEndPoint(opts).proxy();
       break;
     case "host":
-      serialPort = await openSerialPort(serialPortName, baudRate);
+      serialPorts = await Promise.all(serialPortName.map(async (name) => await openSerialPort(name, baudRate)));
       opts = {
-        serialPort,
+        serialPorts,
         port: parseInt(getOption("port", "p", "13808")),
         listen: getOption("listen", "l", "0.0.0.0")
       };

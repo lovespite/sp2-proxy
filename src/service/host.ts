@@ -2,7 +2,7 @@ import { IncomingMessage, ServerResponse, request as _request, createServer } fr
 import { NetConnectOpts, connect as _connect } from "net";
 import internal from "stream";
 import { SerialPort } from "serialport";
-import { PhysicalPortHost } from "../model/PhysicalPortHost";
+import { PhysicalPort } from "../model/PhysicalPort";
 import { ChannelManager } from "../model/ChannelManager";
 import { Channel, ControllerChannel, CtlMessageCommand, CtlMessageFlag } from "../model/Channel";
 
@@ -52,21 +52,24 @@ import { Channel, ControllerChannel, CtlMessageCommand, CtlMessageFlag } from ".
 // }
 
 export type ProxyOptions = {
-  serialPort: SerialPort;
+  serialPorts: SerialPort[];
   port?: number;
   listen?: string;
 };
 
 export class ProxyServer {
   private readonly _options: ProxyOptions;
-  private readonly _host: PhysicalPortHost;
+  private readonly _hosts: PhysicalPort[];
   private readonly _chnManager: ChannelManager;
   private readonly _ctl: ControllerChannel;
 
   constructor(options: ProxyOptions) {
     this._options = options;
-    this._host = new PhysicalPortHost(this._options.serialPort);
-    this._chnManager = new ChannelManager(this._host, "ProxyServer");
+    this._hosts = options.serialPorts.map(port => new PhysicalPort(port));
+
+    this._chnManager = new ChannelManager(this._hosts[0], "ProxyServer");
+    this._chnManager.bindHosts(this._hosts.slice(1));
+
     this._ctl = this._chnManager.ctlChannel;
   }
 
@@ -176,11 +179,7 @@ export class ProxyServer {
   }
 
   public listen() {
-    // const port = parseInt(getOption("port", "p", "13808"));
-    // const listen = getOption("listen", "l", "0.0.0.0");
-    // const serialPort = getOption("serial-port", "sp", ".");
-
-    this._host.start();
+    this._hosts.forEach(host => host.start());
     createServer()
       .on("request", this.request.bind(this))
       .on("connect", this.connect.bind(this))
