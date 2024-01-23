@@ -4,7 +4,8 @@ import internal from "stream";
 import { SerialPort } from "serialport";
 import { PhysicalPort } from "../model/PhysicalPort";
 import { ChannelManager } from "../model/ChannelManager";
-import { Channel, ControllerChannel, CtlMessageCommand, CtlMessageFlag } from "../model/Channel";
+import { Channel, CtlMessageCommand, CtlMessageFlag } from "../model/Channel";
+import { ControllerChannel } from "../model/ControllerChannel";
 
 // function request(cReq: IncomingMessage, cRes: ServerResponse) {
 //   const u = new URL(cReq.url);

@@ -1,6 +1,7 @@
 import { Frame } from "./Frame";
 import { PhysicalPort } from "./PhysicalPort";
-import { Channel, ControllerChannel } from "./Channel";
+import { Channel } from "./Channel";
+import { ControllerChannel } from "./ControllerChannel";
 
 export class ChannelManager {
   private _cid: number = 1;
