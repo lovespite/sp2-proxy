@@ -24,7 +24,7 @@ export default class ProxyEndPoint {
         const { cid, opt } = msg.data;
         const channel = this._channelManager.getChannel(cid);
 
-        console.log("[ProxyEndPoint/Socket]", "Connecting", cid, opt);
+        console.log("[ProxyEndPoint/Socket]", cid, "Connecting", opt);
 
         if (channel) {
           redirectConnectToChn(opt as NetConnectOpts, channel, () => {
@@ -32,8 +32,9 @@ export default class ProxyEndPoint {
             this._channelManager.deleteChannel(channel);
           });
         } else {
-          console.log("[ProxyEndPoint/Socket]", cid, "Channel not found:");
+          console.log("[ProxyEndPoint/Socket]", "Channel not found:", cid);
         }
+
         break;
       }
       case CtlMessageCommand.REQUEST: {
@@ -51,7 +52,7 @@ export default class ProxyEndPoint {
           });
           channel.once("finish", () => this._channelManager.deleteChannel(channel));
         } else {
-          console.log("[ProxyEndPoint/Request]", cid, "Channel not found:");
+          console.log("[ProxyEndPoint/Request]", "Channel not found:", cid);
         }
 
         break;

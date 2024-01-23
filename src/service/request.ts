@@ -7,7 +7,7 @@ export function redirectRequestToChn(reqInfo: RequestOptions, chn: Channel, onCl
   const pReq = request(reqInfo, function (pRes) {
     pRes.pipe(chn);
 
-    console.log("[ProxyEndPoint/Request]", "Connected", chn.cid);
+    console.log("[ProxyEndPoint/Request]", chn.cid, "Connected");
   }).on("error", function (e) {
     console.log("ERROR", request, e);
     chn.push(null);
@@ -24,7 +24,7 @@ export function redirectConnectToChn(reqInfo: NetConnectOpts, chn: Channel, onCl
     socket.pipe(chn);
     chn.pipe(socket);
 
-    console.log("[ProxyEndPoint/Socket]", "Connected", chn.cid);
+    console.log("[ProxyEndPoint/Socket]", chn.cid, "Connected");
   }).on("error", function (e) {
     console.log("ERROR", reqInfo, e);
     chn.push(null);
