@@ -1,7 +1,8 @@
 import { SerialPort } from "serialport";
 import { Frame } from "./Frame";
 import delay from "../utils/delay";
-import { FrameBeg, FrameEnd, ReadFrameParser, buildFrameBuffer, parseFrameBuffer, printBuffer } from "../utils/frame";
+import { FrameBeg, FrameEnd, buildFrameBuffer, parseFrameBuffer } from "../utils/frame";
+import { ReadFrameParser } from "./ReadFrameParser";
 import { Transform } from "stream";
 
 type OnFrameReceivedEvent = (pack: Frame) => void;
@@ -61,7 +62,7 @@ export class PhysicalPortHost {
     const buffer = Buffer.from(msg, "utf8");
 
     const data = buildFrameBuffer(buffer, cid);
- 
+
     this._queueOutgoing.unshift({
       channelId: cid,
       id: 0,
