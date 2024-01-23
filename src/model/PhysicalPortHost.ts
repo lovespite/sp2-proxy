@@ -61,8 +61,7 @@ export class PhysicalPortHost {
     const buffer = Buffer.from(msg, "utf8");
 
     const data = buildFrameBuffer(buffer, cid);
-
-    // high priority
+ 
     this._queueOutgoing.unshift({
       channelId: cid,
       id: 0,

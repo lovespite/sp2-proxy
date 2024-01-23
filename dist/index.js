@@ -36,28 +36,124 @@ function getNextRandomToken() {
 // src/utils/frame.ts
 var import_stream = require("stream");
 var MetaSize = 16;
-var DataSegmentSize = 1500;
+var MaxTransmitionUnitSize = 1500;
 var EscapeChar = 16;
 var FrameBeg = 2;
 var FrameEnd = 3;
+var EscapeChar_Escaped = EscapeChar ^ 255;
+var FrameBeg_Escaped = FrameBeg ^ 255;
+var FrameEnd_Escaped = FrameEnd ^ 255;
 var SpecialChars = [EscapeChar, FrameBeg, FrameEnd];
-var SpecialCharSet = new Set(SpecialChars);
+var SpecialChars_Escaped = [EscapeChar_Escaped, FrameBeg_Escaped, FrameEnd_Escaped];
+var SpecialCharRatioThreshold = 0.077;
 function escapeBuffer(buffer) {
-  let estimatedSize = buffer.length;
-  for (const byte of buffer) {
-    if (SpecialCharSet.has(byte)) {
-      estimatedSize++;
+  const scp = scanBuffer(buffer);
+  if (scp.length === 0)
+    return buffer;
+  const ratio = scp.length / buffer.length;
+  let bf;
+  if (ratio < SpecialCharRatioThreshold) {
+    bf = escapeBufferInternal_BlockCopy(buffer, scp);
+  } else {
+    bf = escapeBufferInternal_ByteByByte(buffer, scp);
+  }
+  return bf;
+}
+function constructTestBuffer(size, specialCharRatio) {
+  const buffer = Buffer.allocUnsafe(size);
+  let specialCharCount = 0;
+  for (let index = 0; index < size; index++) {
+    const rnd = Math.random();
+    if (rnd < specialCharRatio) {
+      buffer[index] = SpecialChars[Math.floor(rnd * 3)];
+      ++specialCharCount;
+    } else {
+      continue;
     }
   }
+  return [buffer, specialCharCount / size];
+}
+function crc32(buffer) {
+  let crc = 4294967295;
+  for (let i = 0; i < buffer.length; i++) {
+    crc = crc ^ buffer[i];
+    for (let j = 0; j < 8; j++) {
+      crc = crc & 1 ? crc >>> 1 ^ 3988292384 : crc >>> 1;
+    }
+  }
+  return crc ^ 4294967295;
+}
+function testEscapeBuffer(buffer) {
+  const crc32origin = crc32(buffer);
+  const t1 = Date.now();
+  const scp = scanBuffer(buffer);
+  const t2 = Date.now();
+  const scanUsage = t2 - t1;
+  const t3 = Date.now();
+  const bf1 = escapeBufferInternal_BlockCopy(buffer, scp);
+  const t4 = Date.now();
+  const bcUsage = t4 - t3;
+  const unescape1 = unescapeBuffer(bf1);
+  const crc32_1 = crc32(unescape1);
+  const bcCrc32Pass = crc32_1 === crc32origin ? "PASS" : "FAIL";
+  const t5 = Date.now();
+  const bf2 = escapeBufferInternal_ByteByByte(buffer, scp);
+  const t6 = Date.now();
+  const bbUsage = t6 - t5;
+  const unescape2 = unescapeBuffer(bf2);
+  const crc32_2 = crc32(unescape2);
+  const bbCrc32Pass = crc32_2 === crc32origin ? "PASS" : "FAIL";
+  console.log(" - [Scan]", scanUsage, "ms (", buffer.length, ") bytes");
+  console.log(" - [Bc-Result]", bcCrc32Pass, "Usage", bcUsage, "ms (", bf1.length, ") bytes");
+  console.log(" - [Bb-Result]", bbCrc32Pass, "Usage", bbUsage, "ms (", bf2.length, ") bytes");
+}
+function scanBuffer(buffer) {
+  const specialCharPositions = [];
+  let sIndex = -1;
+  for (let i = 0; i < buffer.length; i++) {
+    sIndex = SpecialChars.indexOf(buffer[i]);
+    if (sIndex === -1)
+      continue;
+    specialCharPositions.push(i << 2 | sIndex);
+  }
+  return specialCharPositions;
+}
+function escapeBufferInternal_ByteByByte(buffer, specialCharPositions) {
+  let estimatedSize = buffer.length + specialCharPositions.length;
   const escapedBuffer = Buffer.allocUnsafe(estimatedSize);
   let tarPos = 0;
-  for (const byte of buffer) {
-    if (SpecialCharSet.has(byte)) {
+  let byte;
+  let sIndex = -1;
+  for (let index = 0; index < buffer.length; index++) {
+    byte = buffer[index];
+    sIndex = SpecialChars.indexOf(byte);
+    if (sIndex !== -1) {
       escapedBuffer[tarPos++] = EscapeChar;
-      escapedBuffer[tarPos++] = byte ^ 255;
+      escapedBuffer[tarPos++] = SpecialChars_Escaped[sIndex];
     } else {
       escapedBuffer[tarPos++] = byte;
     }
+  }
+  return escapedBuffer;
+}
+function escapeBufferInternal_BlockCopy(buffer, specialCharPositions) {
+  const escapedBufferSize = buffer.length + specialCharPositions.length;
+  const escapedBuffer = Buffer.allocUnsafe(escapedBufferSize);
+  let readPos = 0;
+  let writePos = 0;
+  let pos = 0;
+  let sIndex = 0;
+  for (const bitMergedPos of specialCharPositions) {
+    pos = bitMergedPos >> 2;
+    sIndex = bitMergedPos & 3;
+    buffer.copy(escapedBuffer, writePos, readPos, pos);
+    writePos += pos - readPos;
+    escapedBuffer[writePos++] = EscapeChar;
+    escapedBuffer[writePos++] = SpecialChars_Escaped[sIndex];
+    readPos = pos + 1;
+  }
+  if (readPos < buffer.length) {
+    buffer.copy(escapedBuffer, writePos, readPos);
   }
   return escapedBuffer;
 }
@@ -109,7 +205,7 @@ function slice(data, cid) {
   let index = 0;
   let offset = 0;
   while (offset < data.length) {
-    const dataSlice = data.subarray(offset, offset + DataSegmentSize);
+    const dataSlice = data.subarray(offset, offset + MaxTransmitionUnitSize);
     const pack = {
       channelId: cid,
       id: index,
@@ -117,7 +213,7 @@ function slice(data, cid) {
       length: dataSlice.length
     };
     packs.push(pack);
-    offset += DataSegmentSize;
+    offset += MaxTransmitionUnitSize;
     ++index;
   }
   return packs;
@@ -230,8 +326,6 @@ var ControllerChannel = class extends Channel {
       cb(m, sb);
   }
   sendCtlMessage(msg, cb) {
-    if (this.cid !== 0)
-      throw new Error("Only controller channel can send control message.");
     msg.tk = msg.tk || getNextRandomToken();
     let jsonMessage = JSON.stringify(msg);
     this._host.publishCtlMessage(jsonMessage);
@@ -250,14 +344,10 @@ var ControllerChannel = class extends Channel {
           cb(m);
         }
       } else {
-        try {
-          this.dispatchCtlMessage(m);
-        } catch (e) {
-          console.error("[Controller]", "Dispactching error:", e, msg);
-        }
+        this.dispatchCtlMessage(m);
       }
     } catch (e) {
-      console.error("\u6D88\u606F\u5904\u7406-\u9519\u8BEF", e, msg);
+      console.error("[Controller]", "Dispactching error:", e, msg);
     }
   }
   dispatchCtlMessage(msg) {
@@ -314,7 +404,7 @@ var ChannelManager = class {
   constructor(host, name) {
     this._host = host;
     this._chnManName = name;
-    host.onFrameReceived(this.dispatchPack.bind(this));
+    host.onFrameReceived(this.dispatchFrame.bind(this));
     this._ctlChannel = new ControllerChannel(this._host, this);
   }
   getChannel(id) {
@@ -341,12 +431,12 @@ var ChannelManager = class {
   _host;
   async destroy() {
     this._host.destroy();
-    this._host.offFrameReceived(this.dispatchPack);
+    this._host.offFrameReceived(this.dispatchFrame);
     this._channels.forEach((chn) => chn?.destroy());
     this._channels.clear();
   }
-  dispatchPack(pack) {
-    const { data, channelId, id } = pack;
+  dispatchFrame(frame) {
+    const { data, channelId, id } = frame;
     if (channelId === 0) {
       const message = data.toString("utf8");
       this._ctlChannel.processCtlMessageInternal(message);
@@ -573,6 +663,13 @@ async function test(args2) {
     case "channel_c":
       await channel_test_client(args2[1][0], args2[2][0]);
       break;
+    case "escape": {
+      for (let i = 0; i < 100; i++) {
+        const [buffer, realRatio] = constructTestBuffer(MaxTransmitionUnitSize, i / 100);
+        console.log(i.toString().padStart(2, "0"), "[Escape]", "RealRatio", realRatio);
+        testEscapeBuffer(buffer);
+      }
+    }
     default:
       break;
   }
@@ -815,26 +912,26 @@ var ProxyEndPoint = class {
         console.log("[ProxyEndPoint/Socket]", "Connecting", cid, opt);
         if (channel) {
           redirectConnectToChn(opt, channel, () => {
-            console.log("[ProxyEndPoint/Socket]", "Channel is closing.", cid);
+            console.log("[ProxyEndPoint/Socket]", cid, "Channel is closing.");
             this._channelManager.deleteChannel(channel);
           });
         } else {
-          console.log("[ProxyEndPoint/Socket]", "Channel not found:", cid);
+          console.log("[ProxyEndPoint/Socket]", cid, "Channel not found:");
         }
         break;
       }
       case "R" /* REQUEST */: {
         const { cid, opt } = msg.data;
-        console.log("[ProxyEndPoint/Request]", "Connecting", cid, opt);
+        console.log("[ProxyEndPoint/Request]", cid, "Connecting", opt);
         const channel = this._channelManager.getChannel(cid);
         if (channel) {
           redirectRequestToChn(opt, channel, () => {
-            console.log("[ProxyEndPoint/Request]", "Channel is closing.", cid);
+            console.log("[ProxyEndPoint/Request]", cid, "Channel is closing.");
             this._channelManager.deleteChannel(channel);
           });
           channel.once("finish", () => this._channelManager.deleteChannel(channel));
         } else {
-          console.log("[ProxyEndPoint/Request]", "Channel not found:", cid);
+          console.log("[ProxyEndPoint/Request]", cid, "Channel not found:");
         }
         break;
       }

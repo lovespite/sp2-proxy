@@ -1,5 +1,6 @@
 import { ChannelManager } from "./src/model/ChannelManager.js";
 import { PhysicalPortHost } from "./src/model/PhysicalPortHost.js";
+import { MaxTransmitionUnitSize, constructTestBuffer, testEscapeBuffer } from "./src/utils/frame.js";
 import { openSerialPort } from "./src/utils/serialportHelp.js";
 import * as fs from "fs";
 
@@ -15,6 +16,14 @@ export default async function test(args: [string, string][]) {
       // test channel_c COM2
       await channel_test_client(args[1][0], args[2][0]);
       break;
+    case "escape": {
+      for (let i = 0; i < 100; i++) {
+        const [buffer, realRatio] = constructTestBuffer(MaxTransmitionUnitSize, i / 100);
+
+        console.log(i.toString().padStart(2, "0"), "[Escape]", "RealRatio", realRatio);
+        testEscapeBuffer(buffer);
+      }
+    }
     default:
       break;
   }

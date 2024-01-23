@@ -20,7 +20,7 @@ export default class ProxyEndPoint {
   private onCtlMessageReceived(msg: ControlMessage) {
     switch (msg.cmd) {
       case CtlMessageCommand.CONNECT: {
-        //remote client want to fire a socket connect
+        //remote client want a socket connection
         const { cid, opt } = msg.data;
         const channel = this._channelManager.getChannel(cid);
 
@@ -28,30 +28,30 @@ export default class ProxyEndPoint {
 
         if (channel) {
           redirectConnectToChn(opt as NetConnectOpts, channel, () => {
-            console.log("[ProxyEndPoint/Socket]", "Channel is closing.", cid);
+            console.log("[ProxyEndPoint/Socket]", cid, "Channel is closing.");
             this._channelManager.deleteChannel(channel);
           });
         } else {
-          console.log("[ProxyEndPoint/Socket]", "Channel not found:", cid);
+          console.log("[ProxyEndPoint/Socket]", cid, "Channel not found:");
         }
         break;
       }
       case CtlMessageCommand.REQUEST: {
-        //remote client want to fire an http request
+        //remote client want an http request
         const { cid, opt } = msg.data;
 
-        console.log("[ProxyEndPoint/Request]", "Connecting", cid, opt);
+        console.log("[ProxyEndPoint/Request]", cid, "Connecting", opt);
 
         const channel = this._channelManager.getChannel(cid);
 
         if (channel) {
           redirectRequestToChn(opt as RequestOptions, channel, () => {
-            console.log("[ProxyEndPoint/Request]", "Channel is closing.", cid);
+            console.log("[ProxyEndPoint/Request]", cid, "Channel is closing.");
             this._channelManager.deleteChannel(channel);
           });
           channel.once("finish", () => this._channelManager.deleteChannel(channel));
         } else {
-          console.log("[ProxyEndPoint/Request]", "Channel not found:", cid);
+          console.log("[ProxyEndPoint/Request]", cid, "Channel not found:");
         }
 
         break;

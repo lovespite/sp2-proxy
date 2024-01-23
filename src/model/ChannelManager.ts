@@ -47,7 +47,7 @@ export class ChannelManager {
   constructor(host: PhysicalPortHost, name: string) {
     this._host = host;
     this._chnManName = name;
-    host.onFrameReceived(this.dispatchPack.bind(this));
+    host.onFrameReceived(this.dispatchFrame.bind(this));
     this._ctlChannel = new ControllerChannel(this._host, this);
   }
 
@@ -82,13 +82,13 @@ export class ChannelManager {
 
   public async destroy() {
     this._host.destroy();
-    this._host.offFrameReceived(this.dispatchPack);
+    this._host.offFrameReceived(this.dispatchFrame);
     this._channels.forEach(chn => chn?.destroy());
     this._channels.clear();
   }
 
-  private dispatchPack(pack: Frame) {
-    const { data, channelId, id } = pack;
+  private dispatchFrame(frame: Frame) {
+    const { data, channelId, id } = frame;
 
     if (channelId === 0) {
       // controller message

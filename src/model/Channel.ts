@@ -46,9 +46,12 @@ export class Channel extends Duplex {
     this._host = host;
     this._id = id;
     this._streamBufferIn = [];
+
+    // a zero-length frame
     this._nullPack = buildNullFrameObj(this._id, true);
 
     this.once("finish", () => {
+      // send a zero-length frame to notify the other side that the stream is finished.
       this._host.enqueueOut([this._nullPack]);
     });
   }
@@ -125,8 +128,6 @@ export class ControllerChannel extends Channel {
   }
 
   public sendCtlMessage(msg: ControlMessage, cb?: CtlMessageCallback) {
-    if (this.cid !== 0) throw new Error("Only controller channel can send control message.");
-
     msg.tk = msg.tk || getNextRandomToken();
 
     let jsonMessage = JSON.stringify(msg);
@@ -150,21 +151,16 @@ export class ControllerChannel extends Channel {
         }
       } else {
         // 控制消息
-        try {
-          this.dispatchCtlMessage(m);
-        } catch (e) {
-          console.error("[Controller]", "Dispactching error:", e, msg);
-        }
+        this.dispatchCtlMessage(m);
       }
     } catch (e) {
-      console.error("消息处理-错误", e, msg);
+      console.error("[Controller]", "Dispactching error:", e, msg);
     }
   }
 
   private dispatchCtlMessage(msg: ControlMessage) {
     switch (msg.cmd) {
       case CtlMessageCommand.ESTABLISH: {
-        //remote client want to establish a new channel
         msg.data = this._channelManager.createChannel().cid;
         msg.flag = CtlMessageFlag.CALLBACK;
 
@@ -172,8 +168,6 @@ export class ControllerChannel extends Channel {
         break;
       }
       case CtlMessageCommand.DISPOSE: {
-        //remote client want to close a channel
-
         this._channelManager.deleteChannel(msg.data);
         break;
       }
