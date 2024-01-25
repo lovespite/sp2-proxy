@@ -24,15 +24,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // src/model/Channel.ts
 var import_stream = require("stream");
 
-// src/utils/random.ts
-var counter = 0;
-function getNextCount() {
-  return counter++;
-}
-function getNextRandomToken() {
-  return getNextCount().toString(36);
-}
-
 // src/utils/frame.ts
 var MetaSize = 16;
 var MaxTransmitionUnitSize = 1500;
@@ -278,6 +269,17 @@ var Channel = class extends import_stream.Duplex {
     callback();
   }
 };
+
+// src/utils/random.ts
+var counter = 0;
+function getNextCount() {
+  return counter++;
+}
+function getNextRandomToken() {
+  return getNextCount().toString(36);
+}
+
+// src/model/ControllerChannel.ts
 var ControllerChannel = class extends Channel {
   _cbQueue = /* @__PURE__ */ new Map();
   _ctlMsgHandlers = /* @__PURE__ */ new Set();
@@ -969,8 +971,11 @@ var ProxyEndPoint = class {
 // src/index.ts
 async function main() {
   parse(process.argv.slice(2));
-  const serialPortName = getOption("serial-port", "s", ".").split(",").map((s) => s.trim());
-  const baudRate = parseInt(getOption("baud-rate", "b", "1600000"));
+  const serialPortOpts = getOption("serial-port", "s", ".").split(",").map((s) => s.trim());
+  const baudRateOpts = getOption("baud-rate", "b", "1600000").split(",");
+  const baudRates = baudRateOpts.map((s) => parseInt(s.trim())).filter((n) => !isNaN(n));
+  if (baudRates.length === 0)
+    baudRates.push(16e5);
   let serialPorts;
   let opts;
   const cmd = getCommand();
@@ -989,12 +994,12 @@ async function main() {
       }).catch((err) => console.error(err));
       break;
     case "proxy":
-      serialPorts = await Promise.all(serialPortName.map(async (name) => await openSerialPort(name, baudRate)));
+      serialPorts = await openSerialPorts(serialPortOpts, baudRates);
       opts = { serialPorts };
       await new ProxyEndPoint(opts).proxy();
       break;
     case "host":
-      serialPorts = await Promise.all(serialPortName.map(async (name) => await openSerialPort(name, baudRate)));
+      serialPorts = await openSerialPorts(serialPortOpts, baudRates);
       opts = {
         serialPorts,
         port: parseInt(getOption("port", "p", "13808")),
@@ -1010,3 +1015,10 @@ async function main() {
   }
 }
 main();
+async function openSerialPorts(serialPortOpts, baudRates) {
+  if (baudRates.length !== serialPortOpts.length) {
+    const defaultBaudRate = baudRates[0];
+    baudRates = Array(serialPortOpts.length).fill(defaultBaudRate);
+  }
+  return await Promise.all(serialPortOpts.map(async (name, i) => await openSerialPort(name, baudRates[i])));
+}

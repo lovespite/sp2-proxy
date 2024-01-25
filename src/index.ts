@@ -5,16 +5,21 @@ import printUsage from "./utils/help";
 import * as opt from "./utils/options";
 import { listSerialPorts, openSerialPort } from "./utils/serialportHelp";
 import ProxyEndPoint from "./service/proxy";
+import { futimesSync } from "fs";
 
 async function main() {
   opt.parse(process.argv.slice(2));
 
-  const serialPortName: string[] = opt
+  const serialPortOpts: string[] = opt
     .getOption("serial-port", "s", ".")
     .split(",")
     .map(s => s.trim());
 
-  const baudRate: number = parseInt(opt.getOption("baud-rate", "b", "1600000"));
+  const baudRateOpts = opt.getOption("baud-rate", "b", "1600000").split(",");
+
+  const baudRates = baudRateOpts.map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+
+  if (baudRates.length === 0) baudRates.push(1600000);
 
   let serialPorts: SerialPort[];
   let opts: ProxyOptions;
@@ -38,12 +43,12 @@ async function main() {
         .catch(err => console.error(err));
       break;
     case "proxy":
-      serialPorts = await Promise.all(serialPortName.map(async name => await openSerialPort(name, baudRate)));
+      serialPorts = await openSerialPorts(serialPortOpts, baudRates);
       opts = { serialPorts };
       await new ProxyEndPoint(opts).proxy();
       break;
     case "host":
-      serialPorts = await Promise.all(serialPortName.map(async name => await openSerialPort(name, baudRate)));
+      serialPorts = await openSerialPorts(serialPortOpts, baudRates);
       opts = {
         serialPorts,
         port: parseInt(opt.getOption("port", "p", "13808")),
@@ -60,3 +65,12 @@ async function main() {
 }
 
 main();
+
+async function openSerialPorts(serialPortOpts: string[], baudRates: number[]): Promise<SerialPort[]> {
+  if (baudRates.length !== serialPortOpts.length) {
+    const defaultBaudRate = baudRates[0];
+    baudRates = Array(serialPortOpts.length).fill(defaultBaudRate);
+  }
+
+  return await Promise.all(serialPortOpts.map(async (name, i) => await openSerialPort(name, baudRates[i])));
+}
