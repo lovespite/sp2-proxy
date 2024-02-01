@@ -5,7 +5,7 @@ import printUsage from "./utils/help";
 import * as opt from "./utils/options";
 import { listSerialPorts, openSerialPort } from "./utils/serialportHelp";
 import ProxyEndPoint from "./service/proxy";
-import { futimesSync } from "fs";
+import { Messenger } from "./service/messenger";
 
 async function main() {
   opt.parse(process.argv.slice(2));
@@ -58,6 +58,14 @@ async function main() {
       break;
     case "test":
       await test(opt.getArgs());
+      break;
+    case "msg":
+      serialPorts = await openSerialPorts([serialPortOpts[0]], baudRates);
+      const msg = new Messenger(serialPorts[0]);
+      await msg.start({
+        port: parseInt(opt.getOption("port", "p", "13809")),
+        listen: opt.getOption("listen", "l", "127.0.0.1"),
+      });
       break;
     default:
       printUsage();

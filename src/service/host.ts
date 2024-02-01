@@ -87,7 +87,7 @@ export class ProxyServer {
       const { data: cid, tk } = msg;
 
       chn = this._chnManager.createChannel(cid);
-      console.log("[Channel/Socket]", "Connection established.", chn.cid);
+      console.log("[Channel/Socket]", chn.path, chn.cid, "Connection established.");
       this._ctl.sendCtlMessage(
         {
           cmd: CtlMessageCommand.CONNECT,
@@ -141,7 +141,7 @@ export class ProxyServer {
 
       chn = this._chnManager.createChannel(cid);
 
-      console.log("[Channel/Request]", "Connection established.", chn.cid);
+      console.log("[Channel/Request]", chn.path, chn.cid, "Connection established.");
       this._ctl.sendCtlMessage(
         {
           cmd: CtlMessageCommand.REQUEST,

@@ -4,6 +4,7 @@ import { RequestOptions, request } from "https";
 import { connect } from "net";
 
 export function redirectRequestToChn(reqInfo: RequestOptions, chn: Channel, onClose: () => void) {
+  
   const pReq = request(reqInfo, function (pRes) {
     pRes.pipe(chn);
 

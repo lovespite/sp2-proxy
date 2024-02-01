@@ -19,7 +19,7 @@ export class ChannelManager {
 
     // get the lowest back pressure host
     const map = this._hosts
-      .map(host => ({ host, backPressure: host.backPressure }))
+      .map((host) => ({ host, backPressure: host.backPressure }))
       .sort((a, b) => a.backPressure - b.backPressure);
 
     return map[0].host;
@@ -53,7 +53,8 @@ export class ChannelManager {
     return this._ctlChannel;
   }
 
-  private readonly _channels: Map<number, Channel | null | undefined> = new Map();
+  private readonly _channels: Map<number, Channel | null | undefined> =
+    new Map();
   private readonly _chnManName: string;
 
   public get name() {
@@ -107,7 +108,7 @@ export class ChannelManager {
   public async destroy() {
     this.primaryHost.destroy();
     this.primaryHost.offFrameReceived(this.dispatchFrame);
-    this._channels.forEach(chn => chn?.destroy());
+    this._channels.forEach((chn) => chn?.destroy());
     this._channels.clear();
   }
 
@@ -125,13 +126,21 @@ export class ChannelManager {
     const channel = this.getChannel(channelId);
 
     if (!channel) {
-      console.warn("[ChnMan]", "Frame dropped: ", `Chn. <${channelId}> not found`);
+      console.warn(
+        "[ChnMan]",
+        "Frame dropped: ",
+        `Chn. <${channelId}> not found`
+      );
       this.countDrop();
       return;
     }
 
     if (channel.destroyed) {
-      console.warn("[ChnMan]", "Frame dropped: ", `Chn. <${channelId}> destroyed`);
+      console.warn(
+        "[ChnMan]",
+        "Frame dropped: ",
+        `Chn. <${channelId}> destroyed`
+      );
       this.countDrop();
       return;
     }

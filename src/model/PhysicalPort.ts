@@ -43,6 +43,14 @@ export class PhysicalPort {
     console.log("[PPH]", "Port opened: ", port.path, " @ ", port.baudRate);
   }
 
+  public get path() {
+    return this._physical.path;
+  }
+
+  public get baudRate() {
+    return this._physical.baudRate;
+  }
+
   public async waitForFinish() {
     while (!this._isFinished) {
       await delay(100);

@@ -1,14 +1,28 @@
 {
   "scripts": {
-    "start-host": "node ./dist/index.js host --serial-port=COM1",
-    "start-proxy": "node ./dist/index.js proxy --serial-port=COM2 --port=13808 --listen=0.0.0.0",
     "list-ports": "node ./dist/index.js list",
-    "build": "node build.js"
+    "build": "node build.js",
+    "msg": "node ./dist/index.js msg --serial-port=COM12 --baud-rate=6000000",
+    "msg2": "node ./dist/index.js msg --serial-port=COM15 --baud-rate=6000000 --port=13810 --listen=127.0.0.1",
+    "start": "yarn build & node server.js"
   },
   "dependencies": {
     "@types/node": "^20.11.4",
     "dayjs": "^1.11.10",
     "esbuild": "^0.19.11",
     "serialport": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/figlet": "^1.5.8",
+    "@types/inquirer": "^9.0.7",
+    "express": "^4.18.2"
+  },
+  "name": "sp2proxy",
+  "description": "Proxy for serial port",
+  "version": "1.1.0",
+  "main": "./dist/index.js",
+  "bin": {
+    "sp2proxy": "node ./dist/index.js"
   }
 }

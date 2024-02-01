@@ -25,7 +25,7 @@ export default class ProxyEndPoint {
         const { cid, opt } = msg.data;
         const channel = this._channelManager.getChannel(cid);
 
-        console.log("[ProxyEndPoint/Socket]", cid, "Connecting", opt);
+        console.log("[ProxyEndPoint/Socket]", channel.path, cid, "Connecting", opt);
 
         if (channel) {
           redirectConnectToChn(opt as NetConnectOpts, channel, () => {
@@ -42,9 +42,9 @@ export default class ProxyEndPoint {
         //remote client want an http request
         const { cid, opt } = msg.data;
 
-        console.log("[ProxyEndPoint/Request]", cid, "Connecting", opt);
-
         const channel = this._channelManager.getChannel(cid);
+
+        console.log("[ProxyEndPoint/Request]", channel.path, cid, "Connecting", opt);
 
         if (channel) {
           redirectRequestToChn(opt as RequestOptions, channel, () => {

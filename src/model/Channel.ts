@@ -39,6 +39,10 @@ export class Channel extends Duplex {
     return this._id;
   }
 
+  public get path() {
+    return this._host.path;
+  }
+
   constructor(id: number, host: PhysicalPort) {
     super();
     this._host = host;
