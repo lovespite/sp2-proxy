@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sp2-Proxy Messenger</title>
+    <script src="app.js"></script>
+    <style>
+      #content {
+        width: 100%;
+        height: 100px;
+        margin: 5px 0;
+        resize: none;
+        outline: none;
+        border: 1px solid #aaa;
+        border-radius: 5px;
+        padding: 0;
+      }
+
+      button {
+        width: 80px;
+        padding: 5px;
+        margin: 5px;
+        border-radius: 5px;
+        background-color: #eeeeee;
+        cursor: pointer;
+        border: 1px solid #00000025;
+      }
+
+      button:hover {
+        background-color: #dddddd;
+        color: black;
+      }
+      button:disabled {
+        cursor: default;
+        background-color: #eeeeee;
+        color: #cccccc;
+      }
+
+      .msg-wrapper {
+        width: 100%;
+        height: 500px;
+        overflow-y: auto;
+        background-color: #dddddd;
+        margin: 0;
+        border: 1px solid #aaa;
+      }
+
+      #msg {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        background-color: #dddddd;
+      }
+
+      #msg > p {
+        margin: 5px;
+        padding: 5px;
+        border-radius: 5px;
+        background-color: #ffffff;
+      }
+
+      .my-message {
+        align-self: flex-end;
+        background-color: #00ff00;
+      }
+
+      .remote-message {
+        align-self: flex-start;
+        background-color: #00ffff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <p id="info">Hello.</p>
+      <div id="ctl">
+        <select style="padding: 3px; width: 120px" id="channels"></select>
+        <button id="open">打开</button>
+        <button id="create">创建</button>
+        <button id="close" disabled>关闭</button>
+      </div>
+
+      <div class="msg-wrapper">
+        <div id="msg"></div>
+      </div>
+      <div>
+        <textarea
+          id="content"
+          placeholder="输入消息/Shift+Enter换行"
+        ></textarea>
+      </div>
+      <button id="send">发送</button>
+      <button id="image">图片</button>
+    </div>
+  </body>
+</html>
