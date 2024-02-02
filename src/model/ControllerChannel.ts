@@ -1,14 +1,34 @@
 import { PhysicalPort } from "./PhysicalPort";
 import { ChannelManager } from "./ChannelManager";
 import getNextRandomToken from "../utils/random";
-import {
-  Channel,
-  CtlMessageCallback,
-  CtlMessageHandler,
-  ControlMessage,
-  CtlMessageFlag,
-  CtlMessageCommand,
-} from "./Channel";
+import { Channel } from "./Channel";
+
+export enum CtlMessageFlag {
+  CONTROL = 0,
+  CALLBACK = 1,
+}
+
+export enum CtlMessageCommand {
+  ESTABLISH = "E",
+  DISPOSE = "D",
+  CONNECT = "C",
+  REQUEST = "R",
+}
+
+export type ControlMessage = {
+  tk: string | null;
+  cmd: CtlMessageCommand | string;
+  flag: CtlMessageFlag; // 0 => ctl message, 1 => callback message
+  data?: any;
+  keepAlive?: boolean;
+};
+
+export type CtlMessageCallback = (mReceived: ControlMessage) => void;
+export type CtlMessageSendBackDelegate = (mToSend: ControlMessage) => void;
+export type CtlMessageHandler = (
+  mReceived: ControlMessage,
+  sendBack: CtlMessageSendBackDelegate
+) => void;
 
 export class ControllerChannel extends Channel {
   private readonly _cbQueue: Map<string, CtlMessageCallback> = new Map();
@@ -52,7 +72,7 @@ export class ControllerChannel extends Channel {
         const cb = this._cbQueue.get(m.tk);
         // 回调消息
         if (cb) {
-          this._cbQueue.delete(m.tk);
+          if (!m.keepAlive) this._cbQueue.delete(m.tk);
           cb(m);
         }
       } else {

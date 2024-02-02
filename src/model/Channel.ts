@@ -3,29 +3,6 @@ import { Frame } from "./Frame";
 import { PhysicalPort } from "./PhysicalPort";
 import { buildNullFrameObj, slice } from "../utils/frame";
 
-export enum CtlMessageFlag {
-  CONTROL = 0,
-  CALLBACK = 1,
-}
-
-export enum CtlMessageCommand {
-  ESTABLISH = "E",
-  DISPOSE = "D",
-  CONNECT = "C",
-  REQUEST = "R",
-}
-
-export type ControlMessage = {
-  tk: string | null;
-  cmd: CtlMessageCommand;
-  flag: CtlMessageFlag; // 0 => ctl message, 1 => callback message
-  data?: any;
-};
-
-export type CtlMessageCallback = (mReceived: ControlMessage) => void;
-export type CtlMessageSendBackDelegate = (mToSend: ControlMessage) => void;
-export type CtlMessageHandler = (mReceived: ControlMessage, sendBack: CtlMessageSendBackDelegate) => void;
-
 export class Channel extends Duplex {
   protected readonly _host: PhysicalPort;
   private readonly _id: number;
@@ -58,7 +35,16 @@ export class Channel extends Duplex {
     });
   }
 
-  _write(chunk: any, encoding: BufferEncoding, callback: (error?: Error) => void): void {
+  public finish() {
+    this._host.enqueueOut([this._nullPack]);
+    this.end();
+  }
+
+  _write(
+    chunk: any,
+    encoding: BufferEncoding,
+    callback: (error?: Error) => void
+  ): void {
     let packs: Frame[];
 
     if (chunk instanceof Buffer) {
@@ -94,7 +80,12 @@ export class Channel extends Duplex {
       } else {
         // 如果队列中有待处理数据，先入队
         this._streamBufferIn.push(buffer); // 入队
-        console.warn("[Channel]", "EXT_DATA", buffer ? buffer.length : "[END]", "[QUEUED]");
+        console.warn(
+          "[Channel]",
+          "EXT_DATA",
+          buffer ? buffer.length : "[END]",
+          "[QUEUED]"
+        );
       }
     }
   }

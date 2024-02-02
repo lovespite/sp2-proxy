@@ -1,204 +1,107 @@
-const http = {
-  post: async function (url, data) {
-    const ret = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (ret.status !== 200) throw new Error(ret.statusText);
-
-    return await ret.json();
-  },
-
-  get: async function (url, abortSignal) {
-    const ret = await fetch(url, {
-      signal: abortSignal,
-    });
-
-    if (ret.status !== 200) throw new Error(ret.statusText);
-
-    return await ret.json();
-  },
-
-  delete: async function (url) {
-    const ret = await fetch(url, {
-      method: "DELETE",
-    });
-
-    if (ret.status !== 200) throw new Error(ret.statusText);
-
-    return await ret.json();
-  },
-};
-
-const Api = {
-  /**
-   * @returns {Promise<number[]>}
-   */
-  getChannels: async function () {
-    try {
-      const ret = await http.get("/api/channels");
-      return throwIfNotFulfilled(ret);
-    } catch (e) {
-      showError(e);
-      return [];
-    }
-  },
-
-  /**
-   * @param {number?} cid
-   * @returns {Promise<{token: string, cid: number}>}
-   */
-  openChannel: async function (cid) {
-    try {
-      const ret = cid
-        ? await http.post("/api/channel", { cid })
-        : await await http.post("/api/channel", {});
-      return throwIfNotFulfilled(ret);
-    } catch (e) {
-      showError(e);
-    }
-  },
-  deleteChannel: async function (cid, token) {
-    try {
-      const ret = await http.delete(`/api/channel/${cid}?token=${token}`);
-      console.log(ret);
-      return !!ret.success;
-    } catch (e) {
-      showError(e);
-      return false;
-    }
-  },
-  /**
-   * @param {number} cid
-   * @param {string} token
-   * @param {string} content
-   */
-  sendMessage: async function (cid, token, content, type = 0) {
-    try {
-      const ret = await http.post(`/api/message`, {
-        type, // text
-        token,
-        content,
-        cid,
-      });
-
-      throwIfNotFulfilled(ret);
-    } catch (e) {
-      showError(e);
-    }
-  },
-
-  /**
-   * @param {number} cid
-   * @param {string} token
-   * @param {number} timeout
-   * @param {AbortSignal} abortSignal
-   * @returns
-   */
-  pullMessage: async function (cid, token, timeout, abortSignal) {
-    try {
-      timeout = timeout || 15000; // 15s
-      const ret = await http.get(
-        `/api/message/${cid}?token=${token}&timeout=${timeout}`,
-        abortSignal
-      );
-      if (ret.data) return ret.data;
-      return null; // no message yet
-    } catch (e) {
-      console.error(e);
-    }
-  },
-
-  /**
-   * @param {{
-   * stopSignal: AbortSignal,
-   * cid: number,
-   * token: string,
-   * callback: (message: string) => void
-   * }}} param0
-   * @returns
-   */
-  listenMessage: async function ({ stopSignal, cid, token, callback }) {
-    if (typeof callback !== "function")
-      throw new Error("callback is not a function");
-
-    console.log(cid, "listenMessage started");
-
-    while (!stopSignal.aborted) {
-      const ret = await this.pullMessage(cid, token, 15000, stopSignal); // 15s
-      try {
-        if (ret) callback(ret);
-      } catch (e) {
-        console.error(e);
-      }
-
-      if (stopSignal.aborted) break;
-    }
-
-    console.warn(cid, "listenMessage stopped");
-  },
-};
-
 const maxChannelCount = 20;
 
-function showError(e) {
-  console.error(e);
+const ctls = {
+  slChannels: null,
+  btnReload: null,
 
-  if (
-    e instanceof DOMException &&
-    (e.message.includes("aborted") || e.message.includes("终止"))
-  )
-    // aborted by user, ignore
-    return;
+  btnOpen: null,
+  btnCreate: null,
+  btnClose: null,
 
-  alert(e.message || `${e}`);
-}
+  btnSend: null,
+  btnImage: null,
+  btnFile: null,
 
-function throwIfNotFulfilled(ret) {
-  if (!ret.success) throw new Error(ret.message || "unknown error");
-  return ret.data;
+  txtContent: null,
+
+  chkUseWs: null,
+};
+
+function loadCtls() {
+  ctls.slChannels = document.querySelector("#channels");
+
+  ctls.btnReload = document.querySelector("#reload");
+  ctls.btnOpen = document.querySelector("#open");
+  ctls.btnCreate = document.querySelector("#create");
+  ctls.btnClose = document.querySelector("#close");
+
+  ctls.btnSend = document.querySelector("#send");
+  ctls.btnImage = document.querySelector("#image");
+  ctls.btnFile = document.querySelector("#file");
+
+  ctls.txtContent = document.querySelector("#content");
+
+  ctls.chkUseWs = document.querySelector("#use-ws");
 }
 
 (function () {
   window.onload = async function () {
+    loadCtls();
+
     await loadChannels();
-    document.querySelector("#create").addEventListener("click", newChannel);
-    document.querySelector("#open").addEventListener("click", openChannel);
-    document.querySelector("#close").addEventListener("click", closeChannel);
-    document.querySelector("#send").addEventListener("click", sendTextMessage);
-    document.querySelector("#image").addEventListener("click", sendImage);
+
+    ctls.btnReload.addEventListener("click", reload);
+    ctls.btnOpen.addEventListener("click", openChannel);
+    ctls.btnCreate.addEventListener("click", newChannel);
+    ctls.btnClose.addEventListener("click", closeChannel);
+
+    ctls.btnSend.addEventListener("click", sendTextMessage);
+    ctls.btnImage.addEventListener("click", sendImage);
+    ctls.btnFile.addEventListener("click", sendFile);
+
+    disableOperation(true);
   };
 })();
 
+function disableOperation(disabled) {
+  ctls.txtContent.disabled = disabled;
+  ctls.btnSend.disabled = disabled;
+  ctls.btnImage.disabled = disabled;
+  ctls.btnFile.disabled = disabled;
+}
+
+function setElStatus(connected) {
+  ctls.btnReload.disabled = connected;
+  ctls.btnCreate.disabled = connected;
+  ctls.btnOpen.disabled = connected;
+  ctls.chkUseWs.disabled = connected;
+  ctls.slChannels.disabled = connected;
+
+  ctls.btnClose.disabled = !connected;
+
+  disableOperation(!connected);
+}
+
+async function reload() {
+  await loadChannels();
+}
+
 async function loadChannels(select) {
-  const channels = new Set(await Api.getChannels());
-  const elChannels = document.querySelector("#channels");
+  const channels = [...new Set(await Api.getChannels())];
+  const elChannels = ctls.slChannels;
   elChannels.innerHTML = ""; // clear
 
-  Array(maxChannelCount)
-    .fill(0)
-    .map((_, c) => {
-      const cid = c + 1;
-      const name = `频道${cid}` + (channels.has(cid) ? "" : " (空闲)");
-      return buildChannelOption(cid, name, channels.has(cid));
+  channels
+    .map((cid) => {
+      const name = `频道${cid}`;
+      return buildChannelOption(cid, name, false);
     })
     .forEach((o) => elChannels.appendChild(o));
 
-  if (select > maxChannelCount) {
-    elChannels.appendChild(buildChannelOption(select, `频道${select}`));
+  if (channels.length === 0) {
+    elChannels.appendChild(buildChannelOption(0, "无活跃频道", true));
   }
 
-  if (select) elChannels.value = select;
-}
-
-function disableElements(disabled = true) {
-  document.querySelectorAll("button").forEach((el) => (el.disabled = disabled));
-  document.querySelectorAll("input").forEach((el) => (el.disabled = disabled));
-  document.querySelectorAll("select").forEach((el) => (el.disabled = disabled));
+  if (select) {
+    if (channels.includes(select)) {
+      elChannels.value = select;
+    } else {
+      elChannels.appendChild(
+        buildChannelOption(select, `频道${select}`, false)
+      );
+      elChannels.value = select;
+    }
+  }
 }
 
 async function newChannel() {
@@ -209,17 +112,14 @@ async function newChannel() {
   disableElements(false);
   if (!ret) return;
 
-  const el = document.querySelector("#channels");
-  const buttonCreate = document.querySelector("#create");
-  const buttonClose = document.querySelector("#close");
+  const checkbox = ctls.chkUseWs;
 
   await loadChannels(ret.cid);
 
-  el.disabled = true;
-  buttonCreate.disabled = true;
-  buttonClose.disabled = false;
+  const legacy = !checkbox.checked;
+  startMessageLoop(ret, document.querySelector("#msg"), legacy);
 
-  startMessageLoop(ret, document.querySelector("#msg"));
+  setElStatus(true);
 
   info(`频道${ret.cid}已创建, 令牌: ${ret.token}`);
 }
@@ -227,9 +127,7 @@ async function newChannel() {
 async function openChannel() {
   if (window.current) return;
 
-  const el = document.querySelector("#channels");
-  const buttonOpen = document.querySelector("#open");
-  const buttonClose = document.querySelector("#close");
+  const el = ctls.slChannels;
 
   const cid = el.value;
   const channelId = parseInt(cid);
@@ -240,21 +138,21 @@ async function openChannel() {
   disableElements(false);
   if (!ret) return;
 
-  startMessageLoop(ret, document.querySelector("#msg"));
+  const checkbox = ctls.chkUseWs;
+  const legacy = !checkbox.checked;
+  startMessageLoop(ret, document.querySelector("#msg"), legacy);
 
   await loadChannels(ret.cid);
 
   info(`频道${ret.cid}已打开, 令牌: ${ret.token}`);
 
-  el.disabled = true;
-  buttonOpen.disabled = true;
-  buttonClose.disabled = false;
+  setElStatus(true);
 }
 
 async function sendTextMessage() {
   if (!window.current) return;
 
-  const contentEL = document.querySelector("#content");
+  const contentEL = ctls.txtContent;
   const content = contentEL.value;
 
   console.log(content);
@@ -274,36 +172,19 @@ async function sendTextMessage() {
   contentEL.focus();
 }
 
-function selectImage(callback) {
-  // 创建一个 input 元素用于选择文件
-  var fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.accept = "image/*"; // 限制只能选择图片
-
-  // 当用户选择文件后触发的事件
-  fileInput.onchange = function (e) {
-    var file = e.target.files[0]; // 获取用户选择的第一个文件
-    if (file) {
-      // 可以在这里添加更多的处理，例如预览图片或上传图片
-      callback(file); // 调用回调函数并传递所选文件
-    }
-  };
-
-  fileInput.click(); // 触发文件选择对话框
-}
-
 async function sendImage() {
   if (!window.current) return;
 
   selectImage(onImageSelected);
 
   async function onImageSelected(file) {
-    const dataUrl = await fileToDataURL(file);
+    const contentBuffer = await fileToArrayBuffer(file);
 
     const { cid, token } = window.current;
 
-    await Api.sendMessage(cid, token, dataUrl, 2);
+    await Api.sendImage(cid, token, contentBuffer, file.name);
 
+    const dataUrl = await fileToDataURL(file);
     pushMessageEl(
       { content: dataUrl, type: 2 },
       document.querySelector("#msg"),
@@ -312,12 +193,28 @@ async function sendImage() {
   }
 }
 
-async function closeChannel() {
+async function sendFile() {
   if (!window.current) return;
 
-  const buttonOpen = document.querySelector("#open");
-  const buttonClose = document.querySelector("#close");
-  const buttonCreate = document.querySelector("#create");
+  selectFile(onFileSelected);
+
+  async function onFileSelected(file) {
+    const contentBuffer = await fileToArrayBuffer(file);
+
+    const { cid, token } = window.current;
+
+    await Api.sendFile(cid, token, contentBuffer, file.name);
+
+    pushMessageEl(
+      { content: "", fileName: file.name, type: 1 },
+      document.querySelector("#msg"),
+      "my-message"
+    );
+  }
+}
+
+async function closeChannel() {
+  if (!window.current) return;
 
   const { cid, token } = window.current;
   if (!token) return;
@@ -329,16 +226,11 @@ async function closeChannel() {
 
   stopMessageLoop();
 
-  await loadChannels();
-
   info(`频道${cid}已关闭`);
 
-  const el = document.querySelector("#channels");
+  await loadChannels();
 
-  el.disabled = false;
-  buttonOpen.disabled = false;
-  buttonClose.disabled = true;
-  buttonCreate.disabled = false;
+  setElStatus(false);
 }
 
 function buildChannelOption(cid, name, disabled) {
@@ -354,7 +246,7 @@ function info(msg) {
   el.textContent = msg;
 }
 
-function startMessageLoop(ret, msgContainer) {
+function startMessageLoop(ret, msgContainer, legacy) {
   const controller = new AbortController();
 
   window.current = {
@@ -367,6 +259,10 @@ function startMessageLoop(ret, msgContainer) {
       callback: (message) => {
         pushMessageEl(message, msgContainer, "remote-message");
       },
+      legacy,
+    }).then(() => {
+      // communication terminated
+      closeChannel();
     }),
     controller,
   };
@@ -381,7 +277,7 @@ function stopMessageLoop() {
 }
 
 function pushMessageEl(message, containerEl, className) {
-  const { content, type } = message;
+  const { content, type, fileName } = message;
   const p = document.createElement("p");
 
   switch (type) {
@@ -399,11 +295,16 @@ function pushMessageEl(message, containerEl, className) {
     }
     case 1: {
       // file
-      const a = document.createElement("a");
-      a.href = content;
-      a.textContent = "下载文件";
+      if (content) {
+        const a = document.createElement("a");
+        a.href = content;
+        a.textContent = fileName || "[文件]";
+        a.target = "download";
 
-      p.appendChild(a);
+        p.appendChild(a);
+      } else {
+        p.textContent = fileName || "[文件]";
+      }
 
       break;
     }
@@ -411,8 +312,16 @@ function pushMessageEl(message, containerEl, className) {
       //image
       const img = document.createElement("img");
       img.src = content;
-      img.style.width = "100%";
-      img.style.height = "auto";
+      img.style.maxWidth = "100%";
+
+      img.onload = function () {
+        img.style.width = img.width > 200 ? "200px" : "100%";
+        img.style.height = "auto";
+        img.style.cursor = "pointer";
+        img.addEventListener("click", function () {
+          showImageView(content);
+        });
+      };
 
       p.appendChild(img);
 
@@ -424,14 +333,5 @@ function pushMessageEl(message, containerEl, className) {
   containerEl.parentElement.scrollTo({
     top: containerEl.parentElement.scrollHeight,
     behavior: "smooth",
-  });
-}
-
-async function fileToDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
   });
 }

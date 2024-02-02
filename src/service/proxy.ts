@@ -1,6 +1,6 @@
 import { ChannelManager } from "../model/ChannelManager";
 import { PhysicalPort } from "../model/PhysicalPort";
-import { ControlMessage, CtlMessageCommand } from "../model/Channel";
+import { ControlMessage, CtlMessageCommand } from "../model/ControllerChannel";
 import { RequestOptions } from "http";
 import { NetConnectOpts } from "net";
 import { redirectRequestToChn, redirectConnectToChn } from "./request";
@@ -13,7 +13,7 @@ export default class ProxyEndPoint {
 
   constructor(options: ProxyOptions) {
     this._options = options;
-    this._hosts = options.serialPorts.map(port => new PhysicalPort(port));
+    this._hosts = options.serialPorts.map((port) => new PhysicalPort(port));
     this._channelManager = new ChannelManager(this._hosts[0], "ProxyEndPoint");
     this._channelManager.bindHosts(this._hosts.slice(1));
   }
@@ -25,7 +25,13 @@ export default class ProxyEndPoint {
         const { cid, opt } = msg.data;
         const channel = this._channelManager.getChannel(cid);
 
-        console.log("[ProxyEndPoint/Socket]", channel.path, cid, "Connecting", opt);
+        console.log(
+          "[ProxyEndPoint/Socket]",
+          channel.path,
+          cid,
+          "Connecting",
+          opt
+        );
 
         if (channel) {
           redirectConnectToChn(opt as NetConnectOpts, channel, () => {
@@ -44,14 +50,22 @@ export default class ProxyEndPoint {
 
         const channel = this._channelManager.getChannel(cid);
 
-        console.log("[ProxyEndPoint/Request]", channel.path, cid, "Connecting", opt);
+        console.log(
+          "[ProxyEndPoint/Request]",
+          channel.path,
+          cid,
+          "Connecting",
+          opt
+        );
 
         if (channel) {
           redirectRequestToChn(opt as RequestOptions, channel, () => {
             console.log("[ProxyEndPoint/Request]", cid, "Channel is closing.");
             this._channelManager.deleteChannel(channel);
           });
-          channel.once("finish", () => this._channelManager.deleteChannel(channel));
+          channel.once("finish", () =>
+            this._channelManager.deleteChannel(channel)
+          );
         } else {
           console.log("[ProxyEndPoint/Request]", "Channel not found:", cid);
         }
@@ -65,6 +79,6 @@ export default class ProxyEndPoint {
     const ctl = this._channelManager.ctlChannel;
 
     ctl.onCtlMessageReceived(this.onCtlMessageReceived.bind(this));
-    await Promise.all(this._hosts.map(host => host.start()));
+    await Promise.all(this._hosts.map((host) => host.start()));
   }
 }

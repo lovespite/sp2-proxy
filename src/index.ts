@@ -13,11 +13,13 @@ async function main() {
   const serialPortOpts: string[] = opt
     .getOption("serial-port", "s", ".")
     .split(",")
-    .map(s => s.trim());
+    .map((s) => s.trim());
 
   const baudRateOpts = opt.getOption("baud-rate", "b", "1600000").split(",");
 
-  const baudRates = baudRateOpts.map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+  const baudRates = baudRateOpts
+    .map((s) => parseInt(s.trim()))
+    .filter((n) => !isNaN(n));
 
   if (baudRates.length === 0) baudRates.push(1600000);
 
@@ -32,15 +34,17 @@ async function main() {
   switch (cmd) {
     case "list":
       listSerialPorts()
-        .then(list => {
+        .then((list) => {
           console.log(`Available serial ports:`);
           list.forEach((p, i) => {
             console.log(`[${i + 1}]  ${p.path}`);
-            console.log(`      Manu.:${p.manufacturer} Vend.:${p.vendorId} Prod.:${p.productId}`);
+            console.log(
+              `      Manu.:${p.manufacturer} Vend.:${p.vendorId} Prod.:${p.productId}`
+            );
             console.log("");
           });
         })
-        .catch(err => console.error(err));
+        .catch((err) => console.error(err));
       break;
     case "proxy":
       serialPorts = await openSerialPorts(serialPortOpts, baudRates);
@@ -62,7 +66,7 @@ async function main() {
     case "msg":
       serialPorts = await openSerialPorts([serialPortOpts[0]], baudRates);
       const msg = new Messenger(serialPorts[0]);
-      await msg.start({
+      msg.start({
         port: parseInt(opt.getOption("port", "p", "13809")),
         listen: opt.getOption("listen", "l", "127.0.0.1"),
       });
@@ -74,11 +78,18 @@ async function main() {
 
 main();
 
-async function openSerialPorts(serialPortOpts: string[], baudRates: number[]): Promise<SerialPort[]> {
+async function openSerialPorts(
+  serialPortOpts: string[],
+  baudRates: number[]
+): Promise<SerialPort[]> {
   if (baudRates.length !== serialPortOpts.length) {
     const defaultBaudRate = baudRates[0];
     baudRates = Array(serialPortOpts.length).fill(defaultBaudRate);
   }
 
-  return await Promise.all(serialPortOpts.map(async (name, i) => await openSerialPort(name, baudRates[i])));
+  return await Promise.all(
+    serialPortOpts.map(
+      async (name, i) => await openSerialPort(name, baudRates[i])
+    )
+  );
 }

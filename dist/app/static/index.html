@@ -4,6 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sp2-Proxy Messenger</title>
+    <script src="lib/socket.io.js"></script>
+    <script src="lib/http.js"></script>
+    <script src="lib/api.js"></script>
+    <script src="lib/utils.js"></script>
     <script src="app.js"></script>
     <style>
       #content {
@@ -76,9 +80,12 @@
       <p id="info">Hello.</p>
       <div id="ctl">
         <select style="padding: 3px; width: 120px" id="channels"></select>
+        <button id="reload">刷新</button>
         <button id="open">打开</button>
         <button id="create">创建</button>
         <button id="close" disabled>关闭</button>
+        <input id="use-ws" type="checkbox" checked />
+        <label for="use-ws">使用WebSocket</label>
       </div>
 
       <div class="msg-wrapper">
@@ -92,6 +99,7 @@
       </div>
       <button id="send">发送</button>
       <button id="image">图片</button>
+      <button id="file">文件</button>
     </div>
   </body>
 </html>

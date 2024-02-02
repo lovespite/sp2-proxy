@@ -1,10 +1,16 @@
-import { IncomingMessage, ServerResponse, request as _request, createServer } from "http";
+import {
+  IncomingMessage,
+  ServerResponse,
+  request as _request,
+  createServer,
+} from "http";
 import { NetConnectOpts, connect as _connect } from "net";
 import internal from "stream";
 import { SerialPort } from "serialport";
 import { PhysicalPort } from "../model/PhysicalPort";
 import { ChannelManager } from "../model/ChannelManager";
-import { Channel, CtlMessageCommand, CtlMessageFlag } from "../model/Channel";
+import { Channel } from "../model/Channel";
+import { CtlMessageCommand, CtlMessageFlag } from "../model/ControllerChannel";
 import { ControllerChannel } from "../model/ControllerChannel";
 
 // function request(cReq: IncomingMessage, cRes: ServerResponse) {
@@ -66,7 +72,7 @@ export class ProxyServer {
 
   constructor(options: ProxyOptions) {
     this._options = options;
-    this._hosts = options.serialPorts.map(port => new PhysicalPort(port));
+    this._hosts = options.serialPorts.map((port) => new PhysicalPort(port));
 
     this._chnManager = new ChannelManager(this._hosts[0], "ProxyServer");
     this._chnManager.bindHosts(this._hosts.slice(1));
@@ -87,7 +93,12 @@ export class ProxyServer {
       const { data: cid, tk } = msg;
 
       chn = this._chnManager.createChannel(cid);
-      console.log("[Channel/Socket]", chn.path, chn.cid, "Connection established.");
+      console.log(
+        "[Channel/Socket]",
+        chn.path,
+        chn.cid,
+        "Connection established."
+      );
       this._ctl.sendCtlMessage(
         {
           cmd: CtlMessageCommand.CONNECT,
@@ -102,7 +113,7 @@ export class ProxyServer {
         console.log("ERROR", e);
         sock.push(null);
       });
-      sock.on("error", e => {
+      sock.on("error", (e) => {
         console.log("ERROR", e);
         chn.push(null);
       });
@@ -141,7 +152,12 @@ export class ProxyServer {
 
       chn = this._chnManager.createChannel(cid);
 
-      console.log("[Channel/Request]", chn.path, chn.cid, "Connection established.");
+      console.log(
+        "[Channel/Request]",
+        chn.path,
+        chn.cid,
+        "Connection established."
+      );
       this._ctl.sendCtlMessage(
         {
           cmd: CtlMessageCommand.REQUEST,
@@ -156,7 +172,7 @@ export class ProxyServer {
         console.error("ERROR", e);
         res.end();
       });
-      res.on("error", e => {
+      res.on("error", (e) => {
         console.error("ERROR", e);
         chn.push(null);
       });
@@ -180,7 +196,7 @@ export class ProxyServer {
   }
 
   public listen() {
-    this._hosts.forEach(host => host.start());
+    this._hosts.forEach((host) => host.start());
     createServer()
       .on("request", this.request.bind(this))
       .on("connect", this.connect.bind(this))
