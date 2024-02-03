@@ -19,7 +19,7 @@ import { ChildProcessWithoutNullStreams, exec, spawn } from "child_process";
 import path from "path";
 import * as fsys from "../utils/fsys";
 
-const version = "0.0.1";
+const version = "1.0.1";
 const root = __dirname;
 const static_root = path.resolve(root, "app", "static");
 const static_root2 = path.resolve(os.homedir(), "sp2mux-files");
@@ -49,8 +49,11 @@ type MessageChannel = {
 enum ExMessageCmd {
   GET_CHANNELS = "&00",
   SHELL = "&01",
-  FILE = "&02",
-  IMAGE = "&03",
+  REC_FILE = "&02",
+  REC_IMAGE = "&03",
+  READ_DIR = "&04", // TODO: not implemented yet
+  GET_FILE = "&05", // TODO: not implemented yet
+  PUT_FILE = "&06", // TODO: not implemented yet
 }
 
 export class Messenger {
@@ -125,12 +128,10 @@ export class Messenger {
 
       case ExMessageCmd.SHELL: {
         // shell command
-        const { command, cid } = msg.data as { command: string; cid: number };
-        const msgChannel = this._tokenMap.get(cid);
+        const { command } = msg.data as { command: string; cid: number };
+        // const msgChannel = this._tokenMap.get(cid);
 
-        console.log("shell command", cid, `\`${command}\``);
-
-        if (!msgChannel || !command) {
+        if (!command) {
           msg.flag = CtlMessageFlag.CALLBACK;
           msg.data = { message: "invalid command", success: false };
           sb(msg);
@@ -159,6 +160,16 @@ export class Messenger {
             console.log("shell command exit", code, signal);
           });
 
+          // msgChannel.childProcess = child;
+          sChannel.once("end", () => {
+            try {
+              console.log("shell channel closed, process exiting...");
+              child.kill();
+            } catch (e) {
+              // ignore
+            }
+          });
+
           msg.flag = CtlMessageFlag.CALLBACK;
           msg.data = {
             message: "established",
@@ -166,35 +177,26 @@ export class Messenger {
             cid: sChannel.cid,
           };
 
-          msgChannel.childProcess = child;
-
           sb(msg);
         } catch (e) {
           msg.flag = CtlMessageFlag.CALLBACK;
           msg.data = { message: e.message, success: false };
+
           sb(msg);
         }
 
         break;
       }
 
-      case ExMessageCmd.IMAGE:
-      case ExMessageCmd.FILE: {
-        // console.log("file request", msg);
-
+      case ExMessageCmd.REC_IMAGE:
+      case ExMessageCmd.REC_FILE: {
         const { name, cid, sha1 } = msg.data as {
           name: string;
-          cid: number;
+          cid: number | null;
           sha1: string;
         };
-        const msgChannel = this._tokenMap.get(cid);
 
-        if (!msgChannel) {
-          msg.flag = CtlMessageFlag.CALLBACK;
-          msg.data = null;
-          sb(msg);
-          return;
-        }
+        const msgChannel = cid ? this._tokenMap.get(cid) || null : null;
 
         const ext = "." + name.split(".").pop() || "bin";
 
@@ -227,15 +229,15 @@ export class Messenger {
           if (sha1File !== sha1) {
             fsys.try_rm(fullName);
 
-            msgChannel.queue.enqueue({
+            msgChannel?.queue.enqueue({
               type: MessageContentType.Text,
-              content: "[文件/图片传输失败：文件校验失败]",
+              content: "[文件/图片传输失败：文件校验错误]",
               mineType: "text/plain",
             });
           } else {
-            msgChannel.queue.enqueue({
+            msgChannel?.queue.enqueue({
               type:
-                msg.cmd === ExMessageCmd.IMAGE
+                msg.cmd === ExMessageCmd.REC_IMAGE
                   ? MessageContentType.Image
                   : MessageContentType.File,
               content: uri,
@@ -244,6 +246,20 @@ export class Messenger {
             });
           }
         });
+
+        sb(msg);
+        break;
+      }
+
+      case ExMessageCmd.READ_DIR: {
+        const path = msg.data as string;
+
+        const objs = path
+          ? await fsys.enum_path(path)
+          : await fsys.query_roots();
+
+        msg.flag = CtlMessageFlag.CALLBACK;
+        msg.data = objs;
 
         sb(msg);
         break;
@@ -703,7 +719,7 @@ export class Messenger {
     }
 
     try {
-      await this.sendingBuffer(ExMessageCmd.IMAGE, name, channelId, buffer);
+      await this.buffer(ExMessageCmd.REC_IMAGE, name, buffer, channelId);
 
       response.success(res, "ok");
     } catch (e) {
@@ -712,13 +728,13 @@ export class Messenger {
   }
 
   /**
-   * post /raw/file/:cid?token=xxx&name=xxx
+   * post /raw/file/:cid?name=xxx
    * @param req
    * @param res
    */
   private async postFile(req: Request, res: Response) {
     const { cid } = req.params as { cid: string };
-    const { token, name } = req.query as { token: string; name: string };
+    const { name } = req.query as { name: string };
     const buffer = req.body as Buffer;
 
     if (!name) {
@@ -726,31 +742,13 @@ export class Messenger {
       return;
     }
 
-    if (!token) {
-      response.badRequest(res, "missing token");
-      return;
-    }
-
-    const channelId = parseInt(cid);
+    let channelId = parseInt(cid);
     if (isNaN(channelId)) {
-      response.badRequest(res, "invalid channel id");
-      return;
-    }
-
-    const msgChannel = this._tokenMap.get(channelId);
-
-    if (!msgChannel) {
-      response.notFound(res);
-      return;
-    }
-
-    if (msgChannel.token !== token) {
-      response.accessDenied(res);
-      return;
+      channelId = null;
     }
 
     try {
-      await this.sendingBuffer(ExMessageCmd.FILE, name, channelId, buffer);
+      await this.buffer(ExMessageCmd.REC_FILE, name, buffer, channelId);
 
       response.success(res, "ok");
     } catch (e) {
@@ -758,11 +756,11 @@ export class Messenger {
     }
   }
 
-  private async sendingBuffer(
+  private async buffer(
     cmd: ExMessageCmd,
     name: string,
-    channelId: number,
-    buffer: Buffer
+    buffer: Buffer,
+    channelId?: number
   ) {
     const sha1 = await fsys.hash(buffer);
     return new Promise<void>((resolve, reject) => {

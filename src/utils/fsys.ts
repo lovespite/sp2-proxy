@@ -1,11 +1,15 @@
-import fs, { PathLike, PathOrFileDescriptor, stat } from "fs";
+import fs from "fs";
 import crypto from "crypto";
+import os from "os";
+import { exec } from "child_process";
+import path from "path";
 
 export enum PathType {
   NOT_FOUND = 0,
   FILE = 1,
   DIR = 2,
-  UNKNOWN = 3,
+  UNIX_DEVICE = 3,
+  UNKNOWN = 5,
 }
 
 export enum DataType {
@@ -13,22 +17,34 @@ export enum DataType {
   BUFFER = 1,
 }
 
-export async function path_type_of(path: string) {
-  return new Promise((resolve) => {
-    stat(path, (err, s) => {
+export async function stat_of(path: fs.PathLike): Promise<fs.Stats> {
+  return new Promise((resolve, reject) => {
+    fs.stat(path, (err, stats) => {
       if (err) {
-        resolve(PathType.NOT_FOUND);
+        reject(err);
       } else {
-        if (s.isFile()) {
-          resolve(PathType.FILE);
-        } else if (s.isDirectory()) {
-          resolve(PathType.DIR);
-        } else {
-          resolve(PathType.UNKNOWN);
-        }
+        resolve(stats);
       }
     });
   });
+}
+
+export async function path_type_of(path: string) {
+  const stat = await stat_of(path);
+  if (stat.isFile()) {
+    return PathType.FILE;
+  } else if (stat.isDirectory()) {
+    return PathType.DIR;
+  } else if (stat.isBlockDevice() || stat.isCharacterDevice()) {
+    return PathType.UNIX_DEVICE;
+  } else {
+    return PathType.UNKNOWN;
+  }
+}
+
+export async function path_size_of(path: string) {
+  const { size } = await stat_of(path);
+  return size;
 }
 
 export async function f_exists(path: string) {
@@ -118,10 +134,10 @@ export async function read_file(
   });
 }
 
-export function hash(data: Buffer | PathLike, algorithm: string = "sha1") {
+export function hash(data: Buffer | fs.PathLike, algorithm: string = "sha1") {
   return new Promise<string>((resolve, reject) => {
     if (data instanceof Buffer) {
-      calcBufferSha1(data, algorithm)
+      hash_buffer(data, algorithm)
         .then((hash) => {
           resolve(hash);
         })
@@ -129,7 +145,7 @@ export function hash(data: Buffer | PathLike, algorithm: string = "sha1") {
           reject(err);
         });
     } else {
-      calcFileSha1(data, algorithm)
+      hash_file(data, algorithm)
         .then((hash) => {
           resolve(hash);
         })
@@ -188,15 +204,15 @@ export function rename(src: string, dest: string): Promise<boolean> {
   });
 }
 
-export function open_read(path: PathLike) {
+export function open_read(path: fs.PathLike) {
   return fs.createReadStream(path);
 }
 
-export function open_write(path: PathLike) {
+export function open_write(path: fs.PathLike) {
   return fs.createWriteStream(path);
 }
 
-async function calcBufferSha1(buffer: Buffer, algorithm: string) {
+async function hash_buffer(buffer: Buffer, algorithm: string) {
   return await new Promise<string>((resolve) => {
     const hash = crypto.createHash(algorithm);
     hash.update(buffer);
@@ -204,11 +220,95 @@ async function calcBufferSha1(buffer: Buffer, algorithm: string) {
   });
 }
 
-async function calcFileSha1(path: PathLike, algorithm: string) {
+async function hash_file(path: fs.PathLike, algorithm: string) {
   const hash = crypto.createHash(algorithm);
   const stream = fs.createReadStream(path);
   for await (const chunk of stream) {
     hash.update(chunk);
   }
   return hash.digest("hex");
+}
+
+export interface FileSystemObjectModel {
+  readonly name: string;
+  readonly type: PathType;
+  readonly size: number;
+  readonly path: string;
+  readonly parent: string;
+  readonly lastModified: Date;
+  readonly created: Date;
+}
+
+export async function enum_path(
+  pathname: string
+): Promise<FileSystemObjectModel[]> {
+  const stat = await stat_of(pathname);
+
+  if (!stat.isDirectory()) return Promise.resolve([]);
+  const parent = path.dirname(pathname.toString());
+  return new Promise((resolve, reject) => {
+    fs.readdir(pathname, { withFileTypes: true }, async (err, files) => {
+      if (err) {
+        reject(err);
+      } else {
+        const children: FileSystemObjectModel[] = [];
+        for (const file of files) {
+          if (!file.isFile() && !file.isDirectory()) continue; // skip unknown file types
+
+          const type = file.isDirectory() ? PathType.DIR : PathType.FILE;
+          const stat = await stat_of(file.path);
+          const size = type === PathType.DIR ? -1 : stat.size;
+
+          const fso: FileSystemObjectModel = {
+            name: file.name,
+            type,
+            size,
+            path: file.path,
+            parent,
+            lastModified: stat.mtime,
+            created: stat.ctime,
+          };
+
+          children.push(fso);
+        }
+        resolve(children);
+      }
+    });
+  });
+}
+
+export async function query_roots(): Promise<FileSystemObjectModel[]> {
+  if (os.platform() !== "win32") return Promise.resolve([]); // not supported on non-windows platforms
+
+  return new Promise((resolve, reject) => {
+    exec("wmic logicaldisk get caption", async (err, stdout, stderr) => {
+      if (err) {
+        reject(err);
+      } else {
+        const roots: FileSystemObjectModel[] = [];
+
+        const lines = stdout
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0);
+
+        for (const line of lines) {
+          const stat = await stat_of(line);
+
+          const fso: FileSystemObjectModel = {
+            name: line,
+            type: PathType.DIR,
+            size: -1,
+            path: line,
+            parent: ".",
+            lastModified: stat.mtime,
+            created: stat.ctime,
+          };
+
+          roots.push(fso);
+        }
+        resolve(roots);
+      }
+    });
+  });
 }
