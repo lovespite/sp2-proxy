@@ -8,20 +8,21 @@ import { BlockQueue, QueueTimeoutError } from "../model/BlockQueue";
 import * as response from "../utils/success";
 import { Channel } from "../model/Channel";
 import getNextRandomToken from "../utils/random";
-import * as fs from "fs";
-import crypto from "crypto";
+import os from "os";
 
 import {
   ControlMessage,
-  CtlMessageCommand,
   CtlMessageFlag,
   CtlMessageSendBackDelegate,
 } from "../model/ControllerChannel";
-import { exec } from "child_process";
+import { ChildProcessWithoutNullStreams, exec, spawn } from "child_process";
+import path from "path";
+import * as fsys from "../utils/fsys";
 
 const version = "0.0.1";
 const root = __dirname;
-const static_root = root + "\\app\\static";
+const static_root = path.resolve(root, "app", "static");
+const static_root2 = path.resolve(os.homedir(), "sp2mux-files");
 
 enum MessageContentType {
   Text = 0,
@@ -41,6 +42,8 @@ type MessageChannel = {
   channel: Channel;
   queue: BlockQueue<Message>;
   socket?: ws.Socket;
+  childProcess?: ChildProcessWithoutNullStreams;
+  remoteShellChannelId?: number;
 };
 
 enum ExMessageCmd {
@@ -53,6 +56,7 @@ enum ExMessageCmd {
 export class Messenger {
   private readonly _host: PhysicalPort;
   private readonly _channelManager: ChannelManager;
+  private readonly _systemChannels: Set<number>;
 
   private readonly _tokenMap: Map<number, MessageChannel> = new Map();
 
@@ -60,9 +64,31 @@ export class Messenger {
     this._host = new PhysicalPort(sp);
     this._channelManager = new ChannelManager(this._host, "messenger");
 
-    this._channelManager.ctlChannel.onCtlMessageReceived(
+    this._channelManager.controller.onCtlMessageReceived(
       this.handleControlMessage.bind(this)
     );
+
+    this._systemChannels = new Set();
+  }
+
+  private lockSystemChannel(cid: number) {
+    this._systemChannels.add(cid);
+  }
+
+  private async requireSystemChannel() {
+    const chn = await this._channelManager.requireConnection();
+    this.lockSystemChannel(chn.cid);
+
+    return chn;
+  }
+
+  private releaseSystemChannel(chn: Channel) {
+    this._systemChannels.delete(chn.cid);
+    this._channelManager.releaseConnection(chn);
+  }
+
+  private isSystemChannel(cid: number) {
+    return this._systemChannels.has(cid);
   }
 
   private async getRemoteChannels() {
@@ -77,14 +103,14 @@ export class Messenger {
         reject(new Error("timeout"));
       }, 10_000); // 10s
 
-      this._channelManager.ctlChannel.sendCtlMessage(msg, (m) => {
+      this._channelManager.controller.sendCtlMessage(msg, (m) => {
         clearTimeout(timeOut);
         resolve(m.data);
       });
     });
   }
 
-  private handleControlMessage(
+  private async handleControlMessage(
     msg: ControlMessage,
     sb: CtlMessageSendBackDelegate
   ) {
@@ -92,74 +118,69 @@ export class Messenger {
       case ExMessageCmd.GET_CHANNELS: {
         const ids = this._channelManager.getChannelIds();
         msg.flag = CtlMessageFlag.CALLBACK;
-        msg.data = ids;
+        msg.data = ids.filter((id) => !this.isSystemChannel(id));
         sb(msg);
         break;
       }
 
       case ExMessageCmd.SHELL: {
-        const cmd = msg.data;
+        // shell command
+        const { command, cid } = msg.data as { command: string; cid: number };
+        const msgChannel = this._tokenMap.get(cid);
 
-        const proc = exec(cmd, (error, stdout, stderr) => {
+        console.log("shell command", cid, `\`${command}\``);
+
+        if (!msgChannel || !command) {
           msg.flag = CtlMessageFlag.CALLBACK;
-          if (error) {
-            msg.data = {
-              success: false,
-              finished: true,
-              message: error.message,
-              stderr,
-              stdout,
-            };
-            delete msg.keepAlive; // close the communication socket
-            sb(msg);
-          } else {
-            msg.data = {
-              success: true,
-              finished: false,
-              stderr,
-              stdout,
-            };
-            msg.keepAlive = true; // keep the communication socket
-            sb(msg);
-          }
-        });
+          msg.data = { message: "invalid command", success: false };
+          sb(msg);
+          return;
+        }
 
-        proc.stdout.on("data", (data) => {
+        const sChannel = await this.requireSystemChannel();
+
+        try {
+          const child = spawn(command, {
+            cwd: os.homedir(),
+            shell: true,
+            stdio: "pipe",
+          });
+
+          child.stdout.setEncoding("utf8");
+          child.stderr.setEncoding("utf8");
+
+          sChannel.pipe(child.stdin);
+          child.stdout.pipe(sChannel);
+          child.stderr.pipe(sChannel);
+
+          child.once("exit", (code, signal) => {
+            sChannel.finish();
+            this.releaseSystemChannel(sChannel);
+            console.log("shell command exit", code, signal);
+          });
+
           msg.flag = CtlMessageFlag.CALLBACK;
           msg.data = {
-            finished: false,
-            stdout: data,
+            message: "established",
+            success: true,
+            cid: sChannel.cid,
           };
-          msg.keepAlive = true;
-          sb(msg);
-        });
 
-        proc.stderr.on("data", (data) => {
-          msg.flag = CtlMessageFlag.CALLBACK;
-          msg.data = {
-            finished: false,
-            stderr: data,
-          };
-          msg.keepAlive = true;
-          sb(msg);
-        });
+          msgChannel.childProcess = child;
 
-        proc.on("close", (code) => {
-          msg.flag = CtlMessageFlag.CALLBACK;
-          msg.data = {
-            finished: true,
-            code,
-          };
-          delete msg.keepAlive; // close the communication socket
           sb(msg);
-        });
+        } catch (e) {
+          msg.flag = CtlMessageFlag.CALLBACK;
+          msg.data = { message: e.message, success: false };
+          sb(msg);
+        }
 
         break;
       }
 
       case ExMessageCmd.IMAGE:
       case ExMessageCmd.FILE: {
-        console.log("file request", msg);
+        // console.log("file request", msg);
 
         const { name, cid, sha1 } = msg.data as {
           name: string;
@@ -180,42 +201,48 @@ export class Messenger {
         const fileName = `${randomToken()}${ext}`;
 
         const uri = `/files/${fileName}`;
-        const path = `${static_root}\\files\\${fileName}`;
 
-        const writable = fs.createWriteStream(path);
-        const fChannel = this._channelManager.createChannel();
+        const fullName = path.resolve(static_root2, fileName);
+
+        await fsys
+          .d_exists(static_root2)
+          .then((exists) => exists || fsys.mkdir(static_root2));
+
+        console.log("ready to receive", sha1, fullName);
+        const fChannel = await this.requireSystemChannel();
+        console.log("file channel established", fChannel.cid);
+
+        const writable = fsys.open_write(fullName);
         fChannel.pipe(writable);
 
         msg.flag = CtlMessageFlag.CALLBACK;
         msg.data = fChannel.cid;
 
-        fChannel.once("end", () => {
+        fChannel.once("end", async () => {
           writable.close();
-          this._channelManager.deleteChannel(fChannel);
+          this.releaseSystemChannel(fChannel);
 
-          const sha1Promise = calcFileSha1(path);
+          const sha1File = await fsys.hash(fullName);
 
-          sha1Promise.then((fileSha1) => {
-            if (fileSha1 !== sha1) {
-              fs.rm(path, (e) => console.error(e));
+          if (sha1File !== sha1) {
+            fsys.try_rm(fullName);
 
-              msgChannel.queue.enqueue({
-                type: MessageContentType.Text,
-                content: "[文件/图片传输失败：文件校验失败]",
-                mineType: "text/plain",
-              });
-            } else {
-              msgChannel.queue.enqueue({
-                type:
-                  msg.cmd === ExMessageCmd.IMAGE
-                    ? MessageContentType.Image
-                    : MessageContentType.File,
-                content: uri,
-                fileName: name, // original file name
-                mineType: "application/octet-stream",
-              });
-            }
-          });
+            msgChannel.queue.enqueue({
+              type: MessageContentType.Text,
+              content: "[文件/图片传输失败：文件校验失败]",
+              mineType: "text/plain",
+            });
+          } else {
+            msgChannel.queue.enqueue({
+              type:
+                msg.cmd === ExMessageCmd.IMAGE
+                  ? MessageContentType.Image
+                  : MessageContentType.File,
+              content: uri,
+              fileName: name, // original file name
+              mineType: "application/octet-stream",
+            });
+          }
         });
 
         sb(msg);
@@ -243,11 +270,13 @@ export class Messenger {
     app.delete("/api/channel/:cid", this.closeChannel.bind(this));
     app.post("/api/message", this.postTextMessage.bind(this));
     app.get("/api/message/:cid", this.pullMessage.bind(this));
+    app.post("/api/shell/:cid", this.postShell.bind(this));
 
     app.post("/raw/image/:cid", this.postImage.bind(this));
     app.post("/raw/file/:cid", this.postFile.bind(this));
 
     app.use(express.static(static_root));
+    app.use("/files", express.static(static_root2));
 
     server.listen(port, listen, () => {
       console.log(`Working on http://${listen}:${port}`);
@@ -325,6 +354,7 @@ export class Messenger {
 
     msgChn.socket = socket;
     msgChn.queue.onItemQueued = (item) => {
+      // console.log("received message:", item);
       socket.emit("data", item);
       return false; // no need to keep the item in the queue
     };
@@ -397,14 +427,16 @@ export class Messenger {
         return;
       }
 
-      const channel = this._channelManager.createChannel(cid);
+      const channel = cid
+        ? this._channelManager.use(cid)
+        : await this._channelManager.requireConnection();
 
       const queue = new BlockQueue<Message>(10000);
       const token = getNextRandomToken().padStart(6, "a");
 
       channel.once("close", () => {
         this._tokenMap.delete(channel.cid);
-        this._channelManager.deleteChannel(channel);
+        this._channelManager.releaseConnection(channel);
       });
 
       const parser = channel.pipe(new ReadlineParser());
@@ -424,6 +456,7 @@ export class Messenger {
 
       response.success(res, { token, cid: channel.cid });
     } catch (e) {
+      console.log(e);
       response.internalError(res, e.message);
     }
   }
@@ -517,6 +550,114 @@ export class Messenger {
       const buffer = Buffer.from(JSON.stringify(msg) + "\r\n", "utf8");
       channel.write(buffer);
       response.success(res, "ok");
+    } catch (e) {
+      response.internalError(res, e.message);
+    }
+  }
+
+  /**
+   * post /api/shell/:cid?token=xxx -> { command: "ls -l" }
+   * @param req
+   * @param res
+   */
+  private async postShell(req: Request, res: Response) {
+    const { cid } = req.params as { cid: string };
+    const { token, sid } = req.query as { token: string; sid: string };
+    const { command } = req.body as { command: string };
+
+    if (!token) {
+      response.badRequest(res, "missing token");
+      return;
+    }
+
+    if (!command) {
+      response.badRequest(res, "missing command");
+      return;
+    }
+
+    if (sid) {
+      const shellChannelId = parseInt(sid);
+      const chn = this._channelManager.get(shellChannelId);
+      chn.write(command + "\r\n");
+
+      return response.success(res, {
+        shellChannel: shellChannelId,
+      });
+    }
+
+    const channelId = parseInt(cid);
+    if (isNaN(channelId)) {
+      response.badRequest(res, "invalid channel id");
+      return;
+    }
+    const msgChannel = this._tokenMap.get(channelId);
+
+    if (!msgChannel) {
+      response.notFound(res);
+      return;
+    }
+
+    if (msgChannel.token !== token) {
+      response.accessDenied(res);
+      return;
+    }
+
+    try {
+      const ret = await new Promise<{
+        success: boolean;
+        message: string;
+        cid: number;
+      }>((res) => {
+        const ctl = this._channelManager.controller;
+
+        ctl.sendCtlMessage(
+          {
+            tk: getNextRandomToken(),
+            flag: CtlMessageFlag.CONTROL,
+            cmd: ExMessageCmd.SHELL,
+            data: {
+              command,
+              cid: channelId,
+            },
+          },
+          (m) => {
+            console.log("shell response", m);
+            if (m.data) {
+              res(m.data);
+            } else {
+              res({
+                success: false,
+                message: m.data?.message || "unknown error",
+                cid: 0,
+              });
+            }
+          }
+        );
+      });
+
+      if (!ret.success) return response.fail(res, ret.message);
+      if (!ret.cid) return response.fail(res, "invalid shell channel");
+
+      const sChannel = this._channelManager.get(ret.cid);
+      msgChannel.remoteShellChannelId = ret.cid;
+
+      sChannel
+        .pipe(
+          new ReadlineParser({
+            delimiter: "\r\n",
+          })
+        )
+        .on("data", (line) => {
+          msgChannel.queue.enqueue({
+            type: MessageContentType.Text,
+            content: line,
+            mineType: "text/plain",
+          });
+        });
+
+      response.success(res, {
+        shellChannel: ret.cid,
+      });
     } catch (e) {
       response.internalError(res, e.message);
     }
@@ -623,9 +764,9 @@ export class Messenger {
     channelId: number,
     buffer: Buffer
   ) {
-    const sha1 = await calcBufferSha1(buffer);
+    const sha1 = await fsys.hash(buffer);
     return new Promise<void>((resolve, reject) => {
-      this._channelManager.ctlChannel.sendCtlMessage(
+      this._channelManager.controller.sendCtlMessage(
         {
           tk: getNextRandomToken(),
           flag: CtlMessageFlag.CONTROL,
@@ -637,20 +778,18 @@ export class Messenger {
           },
         },
         (m) => {
-          if (!m.data) {
-            return reject(new Error("cannot establish communication"));
-          }
+          if (!m.data) return reject(new Error("failed to open channel"));
+
           console.log("file channel established", m.data);
 
           const cid = m.data as number;
-          const fChannel = this._channelManager.createChannel(cid);
+          const fChannel = this._channelManager.get(cid);
 
           fChannel.write(buffer, () => {
-            console.log("file sent");
+            // console.log("file sent");
             fChannel.finish();
-            fChannel.end();
             resolve();
-            this._channelManager.deleteChannel(fChannel);
+            this._channelManager.kill(fChannel);
           });
         }
       );
@@ -705,12 +844,30 @@ export class Messenger {
 
   private close(channel: MessageChannel) {
     if (channel.socket) {
+      // close websocket
       channel.socket.disconnect();
       channel.socket = null;
     }
 
+    if (channel.childProcess) {
+      // kill shell process
+      channel.childProcess.kill();
+      channel.childProcess = null;
+    }
+
+    if (channel.remoteShellChannelId) {
+      // close remote shell channel
+      try {
+        const chn = this._channelManager.get(channel.remoteShellChannelId);
+        chn?.write("exit\r\n");
+        chn?.write("exit\r\n");
+      } catch (e) {
+        console.log(e);
+      }
+    }
+
     this._tokenMap.delete(channel.channel.cid);
-    this._channelManager.deleteChannel(channel.channel);
+    this._channelManager.releaseConnection(channel.channel);
     channel.queue.destroy();
     channel.channel.destroy();
   }
@@ -729,21 +886,4 @@ function randomToken() {
     Date.now().toString(36) +
     getNextRandomToken()
   );
-}
-
-async function calcBufferSha1(buffer: Buffer) {
-  return new Promise<string>((resolve, reject) => {
-    const hash = crypto.createHash("sha1");
-    hash.update(buffer);
-    resolve(hash.digest("hex"));
-  });
-}
-
-async function calcFileSha1(path: string) {
-  const hash = crypto.createHash("sha1");
-  const stream = fs.createReadStream(path);
-  for await (const chunk of stream) {
-    hash.update(chunk);
-  }
-  return hash.digest("hex");
 }

@@ -1,5 +1,5 @@
 import { PhysicalPort } from "./PhysicalPort";
-import { ChannelManager } from "./ChannelManager";
+import { ChannelManager, Controller } from "./ChannelManager";
 import getNextRandomToken from "../utils/random";
 import { Channel } from "./Channel";
 
@@ -30,27 +30,33 @@ export type CtlMessageHandler = (
   sendBack: CtlMessageSendBackDelegate
 ) => void;
 
+export type AsyncCtlMessageHandler = (
+  mReceived: ControlMessage,
+  sendBack: CtlMessageSendBackDelegate
+) => Promise<void>;
+
 export class ControllerChannel extends Channel {
+  private readonly _ctl: Controller;
+
   private readonly _cbQueue: Map<string, CtlMessageCallback> = new Map();
   private readonly _ctlMsgHandlers: Set<CtlMessageHandler> = new Set();
 
-  private readonly _channelManager: ChannelManager;
-  constructor(host: PhysicalPort, man: ChannelManager) {
+  constructor(host: PhysicalPort, controller: Controller) {
     super(0, host);
-    this._channelManager = man;
+    this._ctl = controller;
   }
 
-  public onCtlMessageReceived(cb: CtlMessageHandler) {
+  public onCtlMessageReceived(cb: CtlMessageHandler | AsyncCtlMessageHandler) {
     this._ctlMsgHandlers.add(cb);
   }
 
-  public offCtlMessageReceived(cb: CtlMessageHandler) {
+  public offCtlMessageReceived(cb: CtlMessageHandler | AsyncCtlMessageHandler) {
     this._ctlMsgHandlers.delete(cb);
   }
 
-  private invokeCtlMessageHandlers(m: ControlMessage) {
+  private async invokeCtlMessageHandlers(m: ControlMessage) {
     const sb = this.sendCtlMessage.bind(this);
-    for (const cb of this._ctlMsgHandlers) cb(m, sb);
+    for (const cb of this._ctlMsgHandlers) await cb(m, sb);
   }
 
   public sendCtlMessage(msg: ControlMessage, cb?: CtlMessageCallback) {
@@ -87,14 +93,17 @@ export class ControllerChannel extends Channel {
   private dispatchCtlMessage(msg: ControlMessage) {
     switch (msg.cmd) {
       case CtlMessageCommand.ESTABLISH: {
-        msg.data = this._channelManager.createChannel().cid;
+        msg.data = this._ctl.openChannel().cid;
         msg.flag = CtlMessageFlag.CALLBACK;
 
         this.sendCtlMessage(msg);
         break;
       }
       case CtlMessageCommand.DISPOSE: {
-        this._channelManager.deleteChannel(msg.data);
+        this._ctl.closeChannel(msg.data);
+        msg.flag = CtlMessageFlag.CALLBACK;
+
+        this.sendCtlMessage(msg);
         break;
       }
       default:

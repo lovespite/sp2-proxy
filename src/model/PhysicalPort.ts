@@ -1,11 +1,16 @@
 import { SerialPort } from "serialport";
 import { Frame } from "./Frame";
 import delay from "../utils/delay";
-import { FrameBeg, FrameEnd, buildFrameBuffer, parseFrameBuffer } from "../utils/frame";
+import {
+  FrameBeg,
+  FrameEnd,
+  buildFrameBuffer,
+  parseFrameBuffer,
+} from "../utils/frame";
 import { ReadFrameParser } from "./ReadFrameParser";
 import { Transform } from "stream";
 
-type OnFrameReceivedEvent = (pack: Frame) => void;
+type OnFrameReceivedEvent = (pack: Frame) => void | Promise<void>;
 
 export class PhysicalPort {
   private readonly _queueIncoming: Frame[];
@@ -13,7 +18,7 @@ export class PhysicalPort {
 
   private readonly _physical: SerialPort;
   private readonly _parser: Transform;
-  private readonly frameEventList: Set<OnFrameReceivedEvent> = new Set();
+  private readonly _frameEventList: Set<OnFrameReceivedEvent> = new Set();
 
   private _isDestroyed: boolean = false;
   private _isRunning: boolean = false;
@@ -84,11 +89,11 @@ export class PhysicalPort {
   }
 
   public onFrameReceived(event: OnFrameReceivedEvent) {
-    this.frameEventList.add(event);
+    this._frameEventList.add(event);
   }
 
   public offFrameReceived(event: OnFrameReceivedEvent) {
-    this.frameEventList.delete(event);
+    this._frameEventList.delete(event);
   }
 
   public async start() {
@@ -101,7 +106,10 @@ export class PhysicalPort {
     }
 
     this._isRunning = true;
-    await Promise.all([this.startSendingDequeueTask(), this.startReceivingDequeueTask()]);
+    await Promise.all([
+      this.startSendingDequeueTask(),
+      this.startReceivingDequeueTask(),
+    ]);
   }
 
   private async stop() {
@@ -114,7 +122,7 @@ export class PhysicalPort {
     await this.stop();
     if (this._physical.isOpen) this._physical.close();
     this._parser.destroy();
-    this.frameEventList.clear();
+    this._frameEventList.clear();
     this._queueIncoming.length = 0;
     this._queueOutgoing.length = 0;
   }
@@ -137,9 +145,11 @@ export class PhysicalPort {
 
         if (!this._physical) break;
 
-        this._physical.write(Buffer.concat([this._frameBeg, pack.data, this._frameEnd]));
+        this._physical.write(
+          Buffer.concat([this._frameBeg, pack.data, this._frameEnd])
+        );
 
-        await new Promise(res => this._physical.drain(res));
+        await new Promise((res) => this._physical.drain(res));
         if (!pack.keepAlive) pack.data = null; // release memory
       }
     } catch (e) {
@@ -148,17 +158,14 @@ export class PhysicalPort {
     this._isFinished = true;
   }
 
-  private emitPackReceived(pack: Frame) {
-    return new Promise<void>(resolve => {
-      for (const cb of this.frameEventList) {
-        try {
-          cb(pack);
-        } catch (e) {
-          console.error(e);
-        }
+  private async emitPackReceived(pack: Frame) {
+    for (const cb of this._frameEventList) {
+      try {
+        await cb(pack);
+      } catch (e) {
+        console.error(e);
       }
-      resolve();
-    });
+    }
   }
 
   private async startReceivingDequeueTask() {

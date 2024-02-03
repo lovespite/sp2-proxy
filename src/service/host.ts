@@ -8,10 +8,14 @@ import { NetConnectOpts, connect as _connect } from "net";
 import internal from "stream";
 import { SerialPort } from "serialport";
 import { PhysicalPort } from "../model/PhysicalPort";
-import { ChannelManager } from "../model/ChannelManager";
+import {
+  ChannelManager,
+  EstablishChannelTimeoutError,
+} from "../model/ChannelManager";
 import { Channel } from "../model/Channel";
 import { CtlMessageCommand, CtlMessageFlag } from "../model/ControllerChannel";
 import { ControllerChannel } from "../model/ControllerChannel";
+import getNextRandomToken from "../utils/random";
 
 // function request(cReq: IncomingMessage, cRes: ServerResponse) {
 //   const u = new URL(cReq.url);
@@ -77,34 +81,28 @@ export class ProxyServer {
     this._chnManager = new ChannelManager(this._hosts[0], "ProxyServer");
     this._chnManager.bindHosts(this._hosts.slice(1));
 
-    this._ctl = this._chnManager.ctlChannel;
+    this._ctl = this._chnManager.controller;
   }
 
-  private connect(req: IncomingMessage, sock: internal.Duplex) {
+  private async connect(req: IncomingMessage, sock: internal.Duplex) {
     const u = new URL("http://" + req.url);
-    let chn: Channel;
 
     const opt: NetConnectOpts = {
       port: parseInt(u.port) || 80,
       host: u.hostname,
     };
 
-    const onEstablished = (msg: { data: number; tk: string }) => {
-      const { data: cid, tk } = msg;
+    try {
+      console.log("[Channel/Socket]", "Connecting", u.href, u.port);
+      const chn = await this._chnManager.requireConnection();
+      console.log("[Channel/Socket]", chn.path, chn.cid, "conn established.");
 
-      chn = this._chnManager.createChannel(cid);
-      console.log(
-        "[Channel/Socket]",
-        chn.path,
-        chn.cid,
-        "Connection established."
-      );
       this._ctl.sendCtlMessage(
         {
           cmd: CtlMessageCommand.CONNECT,
-          tk,
+          tk: getNextRandomToken(),
           flag: CtlMessageFlag.CONTROL,
-          data: { cid, opt },
+          data: { cid: chn.cid, opt },
         },
         null
       );
@@ -118,87 +116,79 @@ export class ProxyServer {
         chn.push(null);
       });
 
-      sock.once("close", () => this._chnManager.deleteChannel(chn));
+      sock.once("close", () => this._chnManager.kill(chn));
 
       chn.pipe(sock);
       sock.pipe(chn);
-    };
-
-    console.log("[Channel/Socket]", "Connecting", u.href, u.port);
-    this._ctl.sendCtlMessage(
-      {
-        cmd: CtlMessageCommand.ESTABLISH,
-        tk: null,
-        flag: CtlMessageFlag.CONTROL,
-      },
-      onEstablished as any
-    );
+    } catch (e) {
+      sock.end();
+    }
   }
 
-  private request(req: IncomingMessage, res: ServerResponse) {
-    const u = new URL(req.url);
-    let chn: Channel;
+  // private request(req: IncomingMessage, res: ServerResponse) {
+  //   const u = new URL(req.url);
+  //   let chn: Channel;
 
-    const opt = {
-      hostname: u.hostname,
-      port: u.port || 80,
-      path: u.pathname + u.search,
-      method: req.method,
-      headers: req.headers,
-    };
+  //   const opt = {
+  //     hostname: u.hostname,
+  //     port: u.port || 80,
+  //     path: u.pathname + u.search,
+  //     method: req.method,
+  //     headers: req.headers,
+  //   };
 
-    const onEstablished = (msg: { data: number; tk: string }) => {
-      const { data: cid, tk } = msg;
+  //   const onEstablished = (msg: { data: number; tk: string }) => {
+  //     const { data: cid, tk } = msg;
 
-      chn = this._chnManager.createChannel(cid);
+  //     chn = this._chnManager.createChannel(cid);
 
-      console.log(
-        "[Channel/Request]",
-        chn.path,
-        chn.cid,
-        "Connection established."
-      );
-      this._ctl.sendCtlMessage(
-        {
-          cmd: CtlMessageCommand.REQUEST,
-          tk,
-          flag: CtlMessageFlag.CONTROL,
-          data: { cid, opt },
-        },
-        null
-      );
+  //     console.log(
+  //       "[Channel/Request]",
+  //       chn.path,
+  //       chn.cid,
+  //       "Connection established."
+  //     );
+  //     this._ctl.sendCtlMessage(
+  //       {
+  //         cmd: CtlMessageCommand.REQUEST,
+  //         tk,
+  //         flag: CtlMessageFlag.CONTROL,
+  //         data: { cid, opt },
+  //       },
+  //       null
+  //     );
 
-      chn.on("error", (e: any) => {
-        console.error("ERROR", e);
-        res.end();
-      });
-      res.on("error", (e) => {
-        console.error("ERROR", e);
-        chn.push(null);
-      });
-      res.once("close", () => {
-        this._chnManager.deleteChannel(chn);
-      });
+  //     chn.on("error", (e: any) => {
+  //       console.error("ERROR", e);
+  //       res.end();
+  //     });
+  //     res.on("error", (e) => {
+  //       console.error("ERROR", e);
+  //       chn.push(null);
+  //     });
+  //     res.once("close", () => {
+  //       this._chnManager.deleteChannel(chn);
+  //     });
 
-      chn.pipe(res);
-      req.pipe(chn);
-    };
+  //     chn.pipe(res);
+  //     req.pipe(chn);
+  //   };
 
-    console.log("[Channel/Request]", "Connecting", u.href, u.port);
-    this._ctl.sendCtlMessage(
-      {
-        cmd: CtlMessageCommand.ESTABLISH,
-        tk: null,
-        flag: CtlMessageFlag.CONTROL,
-      },
-      onEstablished as any
-    );
-  }
+  //   console.log("[Channel/Request]", "Connecting", u.href, u.port);
+  //   this._ctl.sendCtlMessage(
+  //     {
+  //       cmd: CtlMessageCommand.ESTABLISH,
+  //       tk: null,
+  //       flag: CtlMessageFlag.CONTROL,
+  //     },
+  //     onEstablished as any
+  //   );
+  // }
 
   public listen() {
     this._hosts.forEach((host) => host.start());
     createServer()
-      .on("request", this.request.bind(this))
+      // .on("request", this.request.bind(this))
       .on("connect", this.connect.bind(this))
       .listen(this._options.port || 13808, this._options.listen || "0.0.0.0");
   }

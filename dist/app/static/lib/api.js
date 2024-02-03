@@ -101,6 +101,29 @@
     /**
      * @param {number} cid
      * @param {string} token
+     * @param {string} command
+     * @param {number?} shellChannel
+     * @returns {Promise<{shellChannel: number}>}
+     */
+    sendShell: async function (cid, token, command, shellChannel) {
+      try {
+        const ret = await http.post(
+          `/api/shell/${cid}?token=${token}&sid=${shellChannel || ""}`,
+          {
+            command,
+          }
+        );
+
+        return throwIfNotFulfilled(ret);
+      } catch (e) {
+        showError(e);
+        return null;
+      }
+    },
+
+    /**
+     * @param {number} cid
+     * @param {string} token
      * @param {number} timeout
      * @param {AbortSignal} abortSignal
      * @returns

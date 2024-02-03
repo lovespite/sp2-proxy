@@ -11,6 +11,7 @@ const ctls = {
   btnSend: null,
   btnImage: null,
   btnFile: null,
+  btnShell: null,
 
   txtContent: null,
 
@@ -28,6 +29,7 @@ function loadCtls() {
   ctls.btnSend = document.querySelector("#send");
   ctls.btnImage = document.querySelector("#image");
   ctls.btnFile = document.querySelector("#file");
+  ctls.btnShell = document.querySelector("#shell");
 
   ctls.txtContent = document.querySelector("#content");
 
@@ -48,6 +50,18 @@ function loadCtls() {
     ctls.btnSend.addEventListener("click", sendTextMessage);
     ctls.btnImage.addEventListener("click", sendImage);
     ctls.btnFile.addEventListener("click", sendFile);
+    ctls.btnShell.addEventListener("click", sendShell);
+
+    ctls.txtContent.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (window.shellChannel) {
+          sendShell();
+        } else {
+          sendTextMessage();
+        }
+      }
+    });
 
     disableOperation(true);
   };
@@ -58,6 +72,7 @@ function disableOperation(disabled) {
   ctls.btnSend.disabled = disabled;
   ctls.btnImage.disabled = disabled;
   ctls.btnFile.disabled = disabled;
+  ctls.btnShell.disabled = disabled;
 }
 
 function setElStatus(connected) {
@@ -172,6 +187,44 @@ async function sendTextMessage() {
   contentEL.focus();
 }
 
+async function sendShell() {
+  if (!window.current) return;
+
+  const { cid, token } = window.current;
+
+  if (!window.shellChannel) {
+    const command = prompt(
+      "请输入要运行的远程终端：\n cmd, powershell, pwsh等",
+      "powershell"
+    );
+
+    if (!command) return;
+    const { shellChannel } = await Api.sendShell(cid, token, command);
+
+    if (!shellChannel) return; // failed to open shell
+
+    window.shellChannel = shellChannel;
+    ctls.txtContent.style.backgroundColor = "black";
+    ctls.txtContent.style.color = "white";
+  } else {
+    const command = ctls.txtContent.value;
+    if (!command) return;
+
+    if (command === "exit") {
+      const quitShellMode = confirm("你输入了退出命令，是否退出远程终端模式？");
+      if (quitShellMode) {
+        window.shellChannel = null;
+        ctls.txtContent.style.backgroundColor = "white";
+        ctls.txtContent.style.color = "black";
+      }
+    }
+
+    await Api.sendShell(cid, token, command, window.shellChannel);
+
+    ctls.txtContent.value = "";
+  }
+}
+
 async function sendImage() {
   if (!window.current) return;
 
@@ -206,7 +259,7 @@ async function sendFile() {
     await Api.sendFile(cid, token, contentBuffer, file.name);
 
     pushMessageEl(
-      { content: "", fileName: file.name, type: 1 },
+      { content: "", fileName: `[FILE] ${file.name}`, type: 1 },
       document.querySelector("#msg"),
       "my-message"
     );
@@ -231,6 +284,12 @@ async function closeChannel() {
   await loadChannels();
 
   setElStatus(false);
+
+  if (window.shellChannel) {
+    window.shellChannel = null;
+    ctls.txtContent.style.backgroundColor = "white";
+    ctls.txtContent.style.color = "black";
+  }
 }
 
 function buildChannelOption(cid, name, disabled) {
@@ -280,6 +339,11 @@ function pushMessageEl(message, containerEl, className) {
   const { content, type, fileName } = message;
   const p = document.createElement("p");
 
+  if (message.type === 0 && (!message.content || !message.content.trim())) {
+    // empty message
+    return;
+  }
+
   switch (type) {
     case 0: {
       //text
@@ -299,7 +363,7 @@ function pushMessageEl(message, containerEl, className) {
         const a = document.createElement("a");
         a.href = content;
         a.textContent = fileName || "[文件]";
-        a.target = "download";
+        a.download = fileName;
 
         p.appendChild(a);
       } else {

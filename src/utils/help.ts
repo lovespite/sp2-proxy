@@ -21,5 +21,14 @@ export default function printUsage() {
   console.log(`        Specify the port to listen.`);
   console.log(`        Default: 13808`);
   console.log(`  host [options]`);
-  console.log(`    Start the host proxy server, where the real traffic outlets.`);
+  console.log(`    Start the host proxy server.`);
+  console.log(`  msg`);
+  console.log(`    Start messenger server.`);
+  console.log(`    Options:`);
+  console.log(`      --listen, -l <ip>`);
+  console.log(`        Specify the IP address to listen.`);
+  console.log(`        Default: 127.0.0.1`);
+  console.log(`      --port, -p <port>`);
+  console.log(`        Specify the port to listen.`);
+  console.log(`        Default: 13809`);
 }

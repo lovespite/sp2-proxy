@@ -1,7 +1,18 @@
 import { Frame } from "./Frame";
 import { PhysicalPort } from "./PhysicalPort";
 import { Channel } from "./Channel";
-import { ControllerChannel } from "./ControllerChannel";
+import {
+  ControlMessage,
+  ControllerChannel,
+  CtlMessageCommand,
+  CtlMessageFlag,
+} from "./ControllerChannel";
+import getNextRandomToken from "../utils/random";
+
+export interface Controller {
+  openChannel(id?: number): Channel;
+  closeChannel(chn: Channel): void;
+}
 
 export class ChannelManager {
   private _cid: number = 1;
@@ -49,7 +60,7 @@ export class ChannelManager {
     return this._droppedCount;
   }
 
-  public get ctlChannel() {
+  public get controller() {
     return this._ctlChannel;
   }
 
@@ -67,7 +78,14 @@ export class ChannelManager {
 
   constructor(primaryHost: PhysicalPort, name: string) {
     this._chnManName = name;
-    this._ctlChannel = new ControllerChannel(primaryHost, this);
+
+    const controller = {
+      openChannel: this.createChannel.bind(this),
+      closeChannel: this.deleteChannel.bind(this),
+    }; // expose the channel manager's management methods to the controller
+
+    this._ctlChannel = new ControllerChannel(primaryHost, controller);
+
     this.bindHosts([primaryHost]);
   }
 
@@ -78,8 +96,72 @@ export class ChannelManager {
     }
   }
 
-  public getChannel(id: number): Channel | undefined {
+  public async requireConnection(timeout: number = 5000) {
+    const tk = getNextRandomToken();
+    const msg: ControlMessage = {
+      cmd: CtlMessageCommand.ESTABLISH,
+      flag: CtlMessageFlag.CONTROL,
+      tk,
+    };
+
+    return new Promise<Channel>((res, rej) => {
+      if (!timeout) timeout = 5000;
+
+      const timeoutHandle = setTimeout(() => {
+        rej(new EstablishChannelTimeoutError());
+      }, timeout);
+
+      this._ctlChannel.sendCtlMessage(msg, (mSentBack) => {
+        if (mSentBack.data && mSentBack.data > 0) {
+          const chn = this.createChannel(mSentBack.data as number);
+          clearTimeout(timeoutHandle);
+          res(chn);
+        } else {
+          rej(new Error("failed to establish channel"));
+        }
+      });
+    });
+  }
+
+  public async releaseConnection(chn: Channel, timeout: number = 5000) {
+    const tk = getNextRandomToken();
+    const msg: ControlMessage = {
+      cmd: CtlMessageCommand.DISPOSE,
+      flag: CtlMessageFlag.CONTROL,
+      tk,
+      data: chn.cid,
+    };
+
+    return new Promise<void>((res, rej) => {
+      const timeoutHandle = setTimeout(() => {
+        rej(new Error("timeout"));
+      }, timeout || 5000);
+
+      this._ctlChannel.sendCtlMessage(msg, () => {
+        clearTimeout(timeoutHandle);
+        this.deleteChannel(chn);
+        chn.destroy();
+        res();
+      });
+    });
+  }
+
+  public kill(chn: Channel) {
+    this.deleteChannel(chn);
+    chn.destroy();
+  }
+
+  public get(id: number): Channel | undefined {
     return this._channels.get(id);
+  }
+
+  public use(id: number) {
+    const chn = this.get(id);
+    if (chn) {
+      return chn;
+    }
+
+    return this.createChannel(id);
   }
 
   public getChannelCount() {
@@ -94,14 +176,14 @@ export class ChannelManager {
     return [...this._channels.keys()];
   }
 
-  public createChannel(id?: number) {
+  private createChannel(id?: number) {
     const cid = id || this.getNextCid();
     const channel = new Channel(cid, this.bestHost);
     this._channels.set(cid, channel);
     return channel;
   }
 
-  public deleteChannel(chn: Channel) {
+  private deleteChannel(chn: Channel) {
     this._channels.delete(chn.cid);
   }
 
@@ -123,7 +205,7 @@ export class ChannelManager {
       return;
     }
 
-    const channel = this.getChannel(channelId);
+    const channel = this.get(channelId);
 
     if (!channel) {
       console.warn(
@@ -152,5 +234,11 @@ export class ChannelManager {
     }
 
     this.count();
+  }
+}
+
+export class EstablishChannelTimeoutError extends Error {
+  constructor() {
+    super("Establish channel timeout");
   }
 }
