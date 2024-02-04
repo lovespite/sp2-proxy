@@ -246,10 +246,10 @@ export async function enum_path(
 
   if (!stat.isDirectory()) return Promise.resolve([]);
   const parent = path.dirname(pathname.toString());
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     fs.readdir(pathname, { withFileTypes: true }, async (err, files) => {
       if (err) {
-        reject(err);
+        resolve([]);
       } else {
         const children: FileSystemObjectModel[] = [];
         for (const file of files) {
