@@ -1,13 +1,7 @@
 import { Frame } from "./Frame";
 import { PhysicalPort } from "./PhysicalPort";
 import { Channel } from "./Channel";
-import {
-  ControlMessage,
-  ControllerChannel,
-  CtlMessageCommand,
-  CtlMessageFlag,
-} from "./ControllerChannel";
-import getNextRandomToken from "../utils/random";
+import { ControllerChannel, CtlMessageCommand } from "./ControllerChannel";
 
 export interface Controller {
   openChannel(id?: number): Channel;
@@ -114,54 +108,28 @@ export class ChannelManager {
   }
 
   public async requireConnection(timeout: number = 5000) {
-    const tk = getNextRandomToken();
-    const msg: ControlMessage = {
-      cmd: CtlMessageCommand.ESTABLISH,
-      flag: CtlMessageFlag.CONTROL,
-      tk,
-    };
+    const ret = await this.controller.callRemoteProc(
+      { cmd: CtlMessageCommand.ESTABLISH },
+      timeout
+    );
 
-    return new Promise<Channel>((res, rej) => {
-      if (!timeout) timeout = 5000;
-
-      const timeoutHandle = setTimeout(() => {
-        rej(new EstablishChannelTimeoutError());
-      }, timeout);
-
-      this._ctlChannel.sendCtlMessage(msg, (mSentBack) => {
-        if (mSentBack.data && mSentBack.data > 0) {
-          const chn = this.createChannel(mSentBack.data as number);
-          clearTimeout(timeoutHandle);
-          res(chn);
-        } else {
-          rej(new Error("failed to establish channel"));
-        }
-      });
-    });
+    if (ret.data && ret.data > 0) {
+      return this.createChannel(ret.data as number);
+    } else {
+      throw new Error("failed to establish channel");
+    }
   }
 
   public async releaseConnection(chn: Channel, timeout: number = 5000) {
-    const tk = getNextRandomToken();
-    const cid = chn.cid;
-    const msg: ControlMessage = {
-      cmd: CtlMessageCommand.DISPOSE,
-      flag: CtlMessageFlag.CONTROL,
-      tk,
-      data: cid,
-    };
-
     this.kill(chn, 0xfff1);
 
-    return new Promise<void>((res, rej) => {
-      const timeoutHandle = setTimeout(() => {
-        rej(new Error("timeout"));
-      }, timeout || 5000);
-
-      this._ctlChannel.sendCtlMessage(msg, () => {
-        clearTimeout(timeoutHandle);
-        res();
-      });
-    });
+    await this.controller.callRemoteProc(
+      {
+        cmd: CtlMessageCommand.DISPOSE,
+        data: chn.cid,
+      },
+      timeout
+    );
   }
 
   public kill(chn: Channel | number, code: number) {

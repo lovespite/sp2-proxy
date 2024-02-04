@@ -1,5 +1,5 @@
 import { PhysicalPort } from "./PhysicalPort";
-import { ChannelManager, Controller } from "./ChannelManager";
+import { Controller } from "./ChannelManager";
 import getNextRandomToken from "../utils/random";
 import { Channel } from "./Channel";
 
@@ -56,16 +56,45 @@ export class ControllerChannel extends Channel {
 
   private async invokeCtlMessageHandlers(m: ControlMessage) {
     const sb = this.sendCtlMessage.bind(this);
-    for (const cb of this._ctlMsgHandlers) await cb(m, sb);
+    for (const cb of this._ctlMsgHandlers) {
+      cb(m, sb);
+    }
   }
 
-  public sendCtlMessage(msg: ControlMessage, cb?: CtlMessageCallback) {
+  private sendCtlMessage(msg: ControlMessage, cb?: CtlMessageCallback) {
     msg.tk = msg.tk || getNextRandomToken();
 
     let jsonMessage = JSON.stringify(msg);
 
     this._host.publishCtlMessage(jsonMessage);
     if (cb) this._cbQueue.set(msg.tk, cb);
+  }
+
+  public callRemoteProc(
+    msg: Partial<ControlMessage>,
+    timeout: number = 5000,
+    noReturn: boolean = false
+  ): Promise<ControlMessage> {
+    return new Promise((resolve, reject) => {
+      msg.tk = msg.tk || getNextRandomToken();
+      msg.flag = msg.flag || CtlMessageFlag.CONTROL;
+
+      this.sendCtlMessage(msg as any, noReturn ? null : listener);
+
+      if (noReturn) {
+        resolve(null);
+        return;
+      }
+
+      const th = setTimeout(() => {
+        reject(new RpcTimeoutError());
+      }, timeout);
+
+      function listener(msg: ControlMessage) {
+        clearTimeout(th);
+        resolve(msg);
+      }
+    });
   }
 
   public processCtlMessageInternal(msg: string) {
@@ -80,8 +109,6 @@ export class ControllerChannel extends Channel {
         if (cb) {
           if (!m.keepAlive) this._cbQueue.delete(m.tk);
           cb(m);
-
-          console.log("Callback:", m);
         }
       } else {
         // 控制消息
@@ -112,5 +139,11 @@ export class ControllerChannel extends Channel {
         this.invokeCtlMessageHandlers(msg);
         break;
     }
+  }
+}
+
+export class RpcTimeoutError extends Error {
+  constructor() {
+    super("RPC timeout");
   }
 }

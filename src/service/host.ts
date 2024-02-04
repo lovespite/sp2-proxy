@@ -93,18 +93,16 @@ export class ProxyServer {
     };
 
     try {
-      console.log("[Channel/Socket]", "Connecting", u.href, u.port);
       const chn = await this._chnManager.requireConnection();
       console.log("[Channel/Socket]", chn.path, chn.cid, "conn established.");
 
-      this._ctl.sendCtlMessage(
+      await this._ctl.callRemoteProc(
         {
           cmd: CtlMessageCommand.CONNECT,
-          tk: getNextRandomToken(),
-          flag: CtlMessageFlag.CONTROL,
           data: { cid: chn.cid, opt },
         },
-        null
+        5000,
+        true
       );
 
       chn.on("error", (e: any) => {
