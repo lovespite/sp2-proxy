@@ -1,4 +1,2 @@
 node_modules/ 
-dist/app/static/files/ 
-server.cert
-server.key
+dist/app/static/files/
