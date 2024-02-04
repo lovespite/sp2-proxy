@@ -4,4 +4,6 @@ export type Frame = {
   data: Buffer; // buffer
   length: number;
   keepAlive?: boolean;
+  crc32: number;
+  fid: bigint;
 };

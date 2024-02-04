@@ -19,7 +19,7 @@ import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 import path from "path";
 import * as fsys from "../utils/fsys";
 
-const version = "1.0.2";
+const version = "2.0.0a";
 const root = __dirname;
 const static_root = path.resolve(root, "app", "static");
 const static_root2 = path.resolve(os.homedir(), "sp2mux-files");
