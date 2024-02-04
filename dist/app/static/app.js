@@ -14,8 +14,6 @@ const ctls = {
   btnShell: null,
 
   txtContent: null,
-
-  chkUseWs: null,
 };
 
 function loadCtls() {
@@ -32,8 +30,6 @@ function loadCtls() {
   ctls.btnShell = document.querySelector("#shell");
 
   ctls.txtContent = document.querySelector("#content");
-
-  ctls.chkUseWs = document.querySelector("#use-ws");
 }
 
 (function () {
@@ -79,7 +75,6 @@ function setElStatus(connected) {
   ctls.btnReload.disabled = connected;
   ctls.btnCreate.disabled = connected;
   ctls.btnOpen.disabled = connected;
-  ctls.chkUseWs.disabled = connected;
   ctls.slChannels.disabled = connected;
 
   ctls.btnClose.disabled = !connected;
@@ -127,12 +122,9 @@ async function newChannel() {
   disableElements(false);
   if (!ret) return;
 
-  const checkbox = ctls.chkUseWs;
-
   await loadChannels(ret.cid);
 
-  const legacy = !checkbox.checked;
-  startMessageLoop(ret, document.querySelector("#msg"), legacy);
+  startMessageLoop(ret, document.querySelector("#msg"));
 
   setElStatus(true);
 
@@ -153,9 +145,7 @@ async function openChannel() {
   disableElements(false);
   if (!ret) return;
 
-  const checkbox = ctls.chkUseWs;
-  const legacy = !checkbox.checked;
-  startMessageLoop(ret, document.querySelector("#msg"), legacy);
+  startMessageLoop(ret, document.querySelector("#msg"));
 
   await loadChannels(ret.cid);
 
@@ -305,20 +295,18 @@ function info(msg) {
   el.textContent = msg;
 }
 
-function startMessageLoop(ret, msgContainer, legacy) {
+function startMessageLoop(ret, msgContainer) {
   const controller = new AbortController();
-
   window.current = {
     cid: ret.cid,
     token: ret.token,
     task: Api.listenMessage({
-      stopSignal: controller.signal,
+      controller,
       cid: ret.cid,
       token: ret.token,
       callback: (message) => {
         pushMessageEl(message, msgContainer, "remote-message");
       },
-      legacy,
     }).then(() => {
       // communication terminated
       closeChannel();

@@ -34,7 +34,7 @@ export default class ProxyEndPoint {
         if (channel) {
           redirectConnectToChn(opt as NetConnectOpts, channel, () => {
             console.log("[ProxyEndPoint/Socket]", cid, "Channel is closing.");
-            this._channelManager.kill(channel);
+            this._channelManager.kill(channel, 0x1);
           });
         } else {
           console.log("[ProxyEndPoint/Socket]", "Channel not found:", cid);
@@ -59,9 +59,9 @@ export default class ProxyEndPoint {
         if (channel) {
           redirectRequestToChn(opt as RequestOptions, channel, () => {
             console.log("[ProxyEndPoint/Request]", cid, "Channel is closing.");
-            this._channelManager.kill(channel);
+            this._channelManager.kill(channel, 0x2);
           });
-          channel.once("finish", () => this._channelManager.kill(channel));
+          channel.once("finish", () => this._channelManager.kill(channel, 0x3));
         } else {
           console.log("[ProxyEndPoint/Request]", "Channel not found:", cid);
         }

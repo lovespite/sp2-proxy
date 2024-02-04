@@ -17489,11 +17489,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path2) {
-      if (!path2 || typeof path2 !== "string") {
+    function lookup(path3) {
+      if (!path3 || typeof path3 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path2).toLowerCase().substr(1);
+      var extension2 = extname("x." + path3).toLowerCase().substr(1);
       if (!extension2) {
         return false;
       }
@@ -21381,7 +21381,7 @@ var require_path_to_regexp = __commonJS({
   "node_modules/path-to-regexp/index.js"(exports2, module2) {
     module2.exports = pathtoRegexp;
     var MATCHING_GROUP_REGEXP = /\((?!\?)/g;
-    function pathtoRegexp(path2, keys, options) {
+    function pathtoRegexp(path3, keys, options) {
       options = options || {};
       keys = keys || [];
       var strict = options.strict;
@@ -21392,23 +21392,23 @@ var require_path_to_regexp = __commonJS({
       var i = 0;
       var name = 0;
       var m;
-      if (path2 instanceof RegExp) {
-        while (m = MATCHING_GROUP_REGEXP.exec(path2.source)) {
+      if (path3 instanceof RegExp) {
+        while (m = MATCHING_GROUP_REGEXP.exec(path3.source)) {
           keys.push({
             name: name++,
             optional: false,
             offset: m.index
           });
         }
-        return path2;
+        return path3;
       }
-      if (Array.isArray(path2)) {
-        path2 = path2.map(function(value) {
+      if (Array.isArray(path3)) {
+        path3 = path3.map(function(value) {
           return pathtoRegexp(value, keys, options).source;
         });
-        return new RegExp("(?:" + path2.join("|") + ")", flags);
+        return new RegExp("(?:" + path3.join("|") + ")", flags);
       }
-      path2 = ("^" + path2 + (strict ? "" : path2[path2.length - 1] === "/" ? "?" : "/?")).replace(/\/\(/g, "/(?:").replace(/([\/\.])/g, "\\$1").replace(/(\\\/)?(\\\.)?:(\w+)(\(.*?\))?(\*)?(\?)?/g, function(match, slash, format, key, capture, star, optional, offset) {
+      path3 = ("^" + path3 + (strict ? "" : path3[path3.length - 1] === "/" ? "?" : "/?")).replace(/\/\(/g, "/(?:").replace(/([\/\.])/g, "\\$1").replace(/(\\\/)?(\\\.)?:(\w+)(\(.*?\))?(\*)?(\?)?/g, function(match, slash, format, key, capture, star, optional, offset) {
         slash = slash || "";
         format = format || "";
         capture = capture || "([^\\/" + format + "]+?)";
@@ -21428,10 +21428,10 @@ var require_path_to_regexp = __commonJS({
         }
         return "(.*)";
       });
-      while (m = MATCHING_GROUP_REGEXP.exec(path2)) {
+      while (m = MATCHING_GROUP_REGEXP.exec(path3)) {
         var escapeCount = 0;
         var index = m.index;
-        while (path2.charAt(--index) === "\\") {
+        while (path3.charAt(--index) === "\\") {
           escapeCount++;
         }
         if (escapeCount % 2 === 1) {
@@ -21447,8 +21447,8 @@ var require_path_to_regexp = __commonJS({
         }
         i++;
       }
-      path2 += end ? "$" : path2[path2.length - 1] === "/" ? "" : "(?=\\/|$)";
-      return new RegExp(path2, flags);
+      path3 += end ? "$" : path3[path3.length - 1] === "/" ? "" : "(?=\\/|$)";
+      return new RegExp(path3, flags);
     }
   }
 });
@@ -21461,19 +21461,19 @@ var require_layer = __commonJS({
     var debug = require_src3()("express:router:layer");
     var hasOwnProperty = Object.prototype.hasOwnProperty;
     module2.exports = Layer;
-    function Layer(path2, options, fn) {
+    function Layer(path3, options, fn) {
       if (!(this instanceof Layer)) {
-        return new Layer(path2, options, fn);
+        return new Layer(path3, options, fn);
       }
-      debug("new %o", path2);
+      debug("new %o", path3);
       var opts = options || {};
       this.handle = fn;
       this.name = fn.name || "<anonymous>";
       this.params = void 0;
       this.path = void 0;
-      this.regexp = pathRegexp(path2, this.keys = [], opts);
-      this.regexp.fast_star = path2 === "*";
-      this.regexp.fast_slash = path2 === "/" && opts.end === false;
+      this.regexp = pathRegexp(path3, this.keys = [], opts);
+      this.regexp.fast_star = path3 === "*";
+      this.regexp.fast_slash = path3 === "/" && opts.end === false;
     }
     Layer.prototype.handle_error = function handle_error(error, req, res, next) {
       var fn = this.handle;
@@ -21497,20 +21497,20 @@ var require_layer = __commonJS({
         next(err);
       }
     };
-    Layer.prototype.match = function match(path2) {
+    Layer.prototype.match = function match(path3) {
       var match2;
-      if (path2 != null) {
+      if (path3 != null) {
         if (this.regexp.fast_slash) {
           this.params = {};
           this.path = "";
           return true;
         }
         if (this.regexp.fast_star) {
-          this.params = { "0": decode_param(path2) };
-          this.path = path2;
+          this.params = { "0": decode_param(path3) };
+          this.path = path3;
           return true;
         }
-        match2 = this.regexp.exec(path2);
+        match2 = this.regexp.exec(path3);
       }
       if (!match2) {
         this.params = void 0;
@@ -21603,10 +21603,10 @@ var require_route = __commonJS({
     var slice2 = Array.prototype.slice;
     var toString = Object.prototype.toString;
     module2.exports = Route;
-    function Route(path2) {
-      this.path = path2;
+    function Route(path3) {
+      this.path = path3;
       this.stack = [];
-      debug("new %o", path2);
+      debug("new %o", path3);
       this.methods = {};
     }
     Route.prototype._handles_method = function _handles_method(method) {
@@ -21819,8 +21819,8 @@ var require_router = __commonJS({
         if (++sync > 100) {
           return setImmediate(next, err);
         }
-        var path2 = getPathname(req);
-        if (path2 == null) {
+        var path3 = getPathname(req);
+        if (path3 == null) {
           return done(layerError);
         }
         var layer;
@@ -21828,7 +21828,7 @@ var require_router = __commonJS({
         var route;
         while (match !== true && idx < stack.length) {
           layer = stack[idx++];
-          match = matchLayer(layer, path2);
+          match = matchLayer(layer, path3);
           route = layer.route;
           if (typeof match !== "boolean") {
             layerError = layerError || match;
@@ -21866,18 +21866,18 @@ var require_router = __commonJS({
           } else if (route) {
             layer.handle_request(req, res, next);
           } else {
-            trim_prefix(layer, layerError, layerPath, path2);
+            trim_prefix(layer, layerError, layerPath, path3);
           }
           sync = 0;
         });
       }
-      function trim_prefix(layer, layerError, layerPath, path2) {
+      function trim_prefix(layer, layerError, layerPath, path3) {
         if (layerPath.length !== 0) {
-          if (layerPath !== path2.slice(0, layerPath.length)) {
+          if (layerPath !== path3.slice(0, layerPath.length)) {
             next(layerError);
             return;
           }
-          var c = path2[layerPath.length];
+          var c = path3[layerPath.length];
           if (c && c !== "/" && c !== ".")
             return next(layerError);
           debug("trim prefix (%s) from url %s", layerPath, req.url);
@@ -21957,7 +21957,7 @@ var require_router = __commonJS({
     };
     proto.use = function use(fn) {
       var offset = 0;
-      var path2 = "/";
+      var path3 = "/";
       if (typeof fn !== "function") {
         var arg = fn;
         while (Array.isArray(arg) && arg.length !== 0) {
@@ -21965,7 +21965,7 @@ var require_router = __commonJS({
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path2 = fn;
+          path3 = fn;
         }
       }
       var callbacks = flatten(slice2.call(arguments, offset));
@@ -21977,8 +21977,8 @@ var require_router = __commonJS({
         if (typeof fn !== "function") {
           throw new TypeError("Router.use() requires a middleware function but got a " + gettype(fn));
         }
-        debug("use %o %s", path2, fn.name || "<anonymous>");
-        var layer = new Layer(path2, {
+        debug("use %o %s", path3, fn.name || "<anonymous>");
+        var layer = new Layer(path3, {
           sensitive: this.caseSensitive,
           strict: false,
           end: false
@@ -21988,9 +21988,9 @@ var require_router = __commonJS({
       }
       return this;
     };
-    proto.route = function route(path2) {
-      var route2 = new Route(path2);
-      var layer = new Layer(path2, {
+    proto.route = function route(path3) {
+      var route2 = new Route(path3);
+      var layer = new Layer(path3, {
         sensitive: this.caseSensitive,
         strict: this.strict,
         end: true
@@ -22000,8 +22000,8 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      proto[method] = function(path2) {
-        var route = this.route(path2);
+      proto[method] = function(path3) {
+        var route = this.route(path3);
         route[method].apply(route, slice2.call(arguments, 1));
         return this;
       };
@@ -22037,9 +22037,9 @@ var require_router = __commonJS({
       }
       return toString.call(obj).replace(objectRegExp, "$1");
     }
-    function matchLayer(layer, path2) {
+    function matchLayer(layer, path3) {
       try {
-        return layer.match(path2);
+        return layer.match(path3);
       } catch (err) {
         return err;
       }
@@ -22158,13 +22158,13 @@ var require_view = __commonJS({
   "node_modules/express/lib/view.js"(exports2, module2) {
     "use strict";
     var debug = require_src3()("express:view");
-    var path2 = require("path");
+    var path3 = require("path");
     var fs3 = require("fs");
-    var dirname = path2.dirname;
-    var basename = path2.basename;
-    var extname = path2.extname;
-    var join = path2.join;
-    var resolve = path2.resolve;
+    var dirname = path3.dirname;
+    var basename = path3.basename;
+    var extname = path3.extname;
+    var join = path3.join;
+    var resolve = path3.resolve;
     module2.exports = View;
     function View(name, options) {
       var opts = options || {};
@@ -22193,17 +22193,17 @@ var require_view = __commonJS({
       this.path = this.lookup(fileName);
     }
     View.prototype.lookup = function lookup(name) {
-      var path3;
+      var path4;
       var roots = [].concat(this.root);
       debug('lookup "%s"', name);
-      for (var i = 0; i < roots.length && !path3; i++) {
+      for (var i = 0; i < roots.length && !path4; i++) {
         var root2 = roots[i];
         var loc = resolve(root2, name);
         var dir = dirname(loc);
         var file = basename(loc);
-        path3 = this.resolve(dir, file);
+        path4 = this.resolve(dir, file);
       }
-      return path3;
+      return path4;
     };
     View.prototype.render = function render(options, callback) {
       debug('render "%s"', this.path);
@@ -22211,21 +22211,21 @@ var require_view = __commonJS({
     };
     View.prototype.resolve = function resolve2(dir, file) {
       var ext = this.ext;
-      var path3 = join(dir, file);
-      var stat2 = tryStat(path3);
-      if (stat2 && stat2.isFile()) {
-        return path3;
+      var path4 = join(dir, file);
+      var stat = tryStat(path4);
+      if (stat && stat.isFile()) {
+        return path4;
       }
-      path3 = join(dir, basename(file, ext), "index" + ext);
-      stat2 = tryStat(path3);
-      if (stat2 && stat2.isFile()) {
-        return path3;
+      path4 = join(dir, basename(file, ext), "index" + ext);
+      stat = tryStat(path4);
+      if (stat && stat.isFile()) {
+        return path4;
       }
     };
-    function tryStat(path3) {
-      debug('stat "%s"', path3);
+    function tryStat(path4) {
+      debug('stat "%s"', path4);
       try {
-        return fs3.statSync(path3);
+        return fs3.statSync(path4);
       } catch (e) {
         return void 0;
       }
@@ -22922,9 +22922,9 @@ var require_etag = __commonJS({
       }
       return obj && typeof obj === "object" && "ctime" in obj && toString.call(obj.ctime) === "[object Date]" && "mtime" in obj && toString.call(obj.mtime) === "[object Date]" && "ino" in obj && typeof obj.ino === "number" && "size" in obj && typeof obj.size === "number";
     }
-    function stattag(stat2) {
-      var mtime = stat2.mtime.getTime().toString(16);
-      var size = stat2.size.toString(16);
+    function stattag(stat) {
+      var mtime = stat.mtime.getTime().toString(16);
+      var size = stat.size.toString(16);
       return '"' + size + "-" + mtime + '"';
     }
   }
@@ -23013,7 +23013,7 @@ var require_types = __commonJS({
 // node_modules/mime/mime.js
 var require_mime = __commonJS({
   "node_modules/mime/mime.js"(exports2, module2) {
-    var path2 = require("path");
+    var path3 = require("path");
     var fs3 = require("fs");
     function Mime() {
       this.types = /* @__PURE__ */ Object.create(null);
@@ -23043,8 +23043,8 @@ var require_mime = __commonJS({
       this.define(map2);
       this._loading = null;
     };
-    Mime.prototype.lookup = function(path3, fallback) {
-      var ext = path3.replace(/^.*[\.\/\\]/, "").toLowerCase();
+    Mime.prototype.lookup = function(path4, fallback) {
+      var ext = path4.replace(/^.*[\.\/\\]/, "").toLowerCase();
       return this.types[ext] || fallback || this.default_type;
     };
     Mime.prototype.extension = function(mimeType) {
@@ -23278,28 +23278,28 @@ var require_send = __commonJS({
     var ms = require_ms5();
     var onFinished = require_on_finished();
     var parseRange = require_range_parser();
-    var path2 = require("path");
+    var path3 = require("path");
     var statuses = require_statuses();
     var Stream = require("stream");
     var util = require("util");
-    var extname = path2.extname;
-    var join = path2.join;
-    var normalize = path2.normalize;
-    var resolve = path2.resolve;
-    var sep = path2.sep;
+    var extname = path3.extname;
+    var join = path3.join;
+    var normalize = path3.normalize;
+    var resolve = path3.resolve;
+    var sep = path3.sep;
     var BYTES_RANGE_REGEXP = /^ *bytes=/;
     var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1e3;
     var UP_PATH_REGEXP = /(?:^|[\\/])\.\.(?:[\\/]|$)/;
     module2.exports = send;
     module2.exports.mime = mime;
-    function send(req, path3, options) {
-      return new SendStream(req, path3, options);
+    function send(req, path4, options) {
+      return new SendStream(req, path4, options);
     }
-    function SendStream(req, path3, options) {
+    function SendStream(req, path4, options) {
       Stream.call(this);
       var opts = options || {};
       this.options = opts;
-      this.path = path3;
+      this.path = path4;
       this.req = req;
       this._acceptRanges = opts.acceptRanges !== void 0 ? Boolean(opts.acceptRanges) : true;
       this._cacheControl = opts.cacheControl !== void 0 ? Boolean(opts.cacheControl) : true;
@@ -23345,8 +23345,8 @@ var require_send = __commonJS({
       this._index = index2;
       return this;
     }, "send.index: pass index as option");
-    SendStream.prototype.root = function root2(path3) {
-      this._root = resolve(String(path3));
+    SendStream.prototype.root = function root2(path4) {
+      this._root = resolve(String(path4));
       debug("root %s", this._root);
       return this;
     };
@@ -23459,10 +23459,10 @@ var require_send = __commonJS({
       var lastModified = this.res.getHeader("Last-Modified");
       return parseHttpDate(lastModified) <= parseHttpDate(ifRange);
     };
-    SendStream.prototype.redirect = function redirect(path3) {
+    SendStream.prototype.redirect = function redirect(path4) {
       var res = this.res;
       if (hasListeners(this, "directory")) {
-        this.emit("directory", res, path3);
+        this.emit("directory", res, path4);
         return;
       }
       if (this.hasTrailingSlash()) {
@@ -23482,42 +23482,42 @@ var require_send = __commonJS({
     SendStream.prototype.pipe = function pipe(res) {
       var root2 = this._root;
       this.res = res;
-      var path3 = decode(this.path);
-      if (path3 === -1) {
+      var path4 = decode(this.path);
+      if (path4 === -1) {
         this.error(400);
         return res;
       }
-      if (~path3.indexOf("\0")) {
+      if (~path4.indexOf("\0")) {
         this.error(400);
         return res;
       }
       var parts;
       if (root2 !== null) {
-        if (path3) {
-          path3 = normalize("." + sep + path3);
+        if (path4) {
+          path4 = normalize("." + sep + path4);
         }
-        if (UP_PATH_REGEXP.test(path3)) {
-          debug('malicious path "%s"', path3);
+        if (UP_PATH_REGEXP.test(path4)) {
+          debug('malicious path "%s"', path4);
           this.error(403);
           return res;
         }
-        parts = path3.split(sep);
-        path3 = normalize(join(root2, path3));
+        parts = path4.split(sep);
+        path4 = normalize(join(root2, path4));
       } else {
-        if (UP_PATH_REGEXP.test(path3)) {
-          debug('malicious path "%s"', path3);
+        if (UP_PATH_REGEXP.test(path4)) {
+          debug('malicious path "%s"', path4);
           this.error(403);
           return res;
         }
-        parts = normalize(path3).split(sep);
-        path3 = resolve(path3);
+        parts = normalize(path4).split(sep);
+        path4 = resolve(path4);
       }
       if (containsDotFile(parts)) {
         var access = this._dotfiles;
         if (access === void 0) {
           access = parts[parts.length - 1][0] === "." ? this._hidden ? "allow" : "ignore" : "allow";
         }
-        debug('%s dotfile "%s"', access, path3);
+        debug('%s dotfile "%s"', access, path4);
         switch (access) {
           case "allow":
             break;
@@ -23531,14 +23531,14 @@ var require_send = __commonJS({
         }
       }
       if (this._index.length && this.hasTrailingSlash()) {
-        this.sendIndex(path3);
+        this.sendIndex(path4);
         return res;
       }
-      this.sendFile(path3);
+      this.sendFile(path4);
       return res;
     };
-    SendStream.prototype.send = function send2(path3, stat2) {
-      var len = stat2.size;
+    SendStream.prototype.send = function send2(path4, stat) {
+      var len = stat.size;
       var options = this.options;
       var opts = {};
       var res = this.res;
@@ -23549,9 +23549,9 @@ var require_send = __commonJS({
         this.headersAlreadySent();
         return;
       }
-      debug('pipe "%s"', path3);
-      this.setHeader(path3, stat2);
-      this.type(path3);
+      debug('pipe "%s"', path4);
+      this.setHeader(path4, stat);
+      this.type(path4);
       if (this.isConditionalGET()) {
         if (this.isPreconditionFailure()) {
           this.error(412);
@@ -23601,40 +23601,40 @@ var require_send = __commonJS({
         res.end();
         return;
       }
-      this.stream(path3, opts);
+      this.stream(path4, opts);
     };
-    SendStream.prototype.sendFile = function sendFile(path3) {
+    SendStream.prototype.sendFile = function sendFile(path4) {
       var i = 0;
       var self = this;
-      debug('stat "%s"', path3);
-      fs3.stat(path3, function onstat(err, stat2) {
-        if (err && err.code === "ENOENT" && !extname(path3) && path3[path3.length - 1] !== sep) {
+      debug('stat "%s"', path4);
+      fs3.stat(path4, function onstat(err, stat) {
+        if (err && err.code === "ENOENT" && !extname(path4) && path4[path4.length - 1] !== sep) {
           return next(err);
         }
         if (err)
           return self.onStatError(err);
-        if (stat2.isDirectory())
-          return self.redirect(path3);
-        self.emit("file", path3, stat2);
-        self.send(path3, stat2);
+        if (stat.isDirectory())
+          return self.redirect(path4);
+        self.emit("file", path4, stat);
+        self.send(path4, stat);
       });
       function next(err) {
         if (self._extensions.length <= i) {
           return err ? self.onStatError(err) : self.error(404);
         }
-        var p = path3 + "." + self._extensions[i++];
+        var p = path4 + "." + self._extensions[i++];
         debug('stat "%s"', p);
-        fs3.stat(p, function(err2, stat2) {
+        fs3.stat(p, function(err2, stat) {
           if (err2)
             return next(err2);
-          if (stat2.isDirectory())
+          if (stat.isDirectory())
             return next();
-          self.emit("file", p, stat2);
-          self.send(p, stat2);
+          self.emit("file", p, stat);
+          self.send(p, stat);
         });
       }
     };
-    SendStream.prototype.sendIndex = function sendIndex(path3) {
+    SendStream.prototype.sendIndex = function sendIndex(path4) {
       var i = -1;
       var self = this;
       function next(err) {
@@ -23643,23 +23643,23 @@ var require_send = __commonJS({
             return self.onStatError(err);
           return self.error(404);
         }
-        var p = join(path3, self._index[i]);
+        var p = join(path4, self._index[i]);
         debug('stat "%s"', p);
-        fs3.stat(p, function(err2, stat2) {
+        fs3.stat(p, function(err2, stat) {
           if (err2)
             return next(err2);
-          if (stat2.isDirectory())
+          if (stat.isDirectory())
             return next();
-          self.emit("file", p, stat2);
-          self.send(p, stat2);
+          self.emit("file", p, stat);
+          self.send(p, stat);
         });
       }
       next();
     };
-    SendStream.prototype.stream = function stream(path3, options) {
+    SendStream.prototype.stream = function stream(path4, options) {
       var self = this;
       var res = this.res;
-      var stream2 = fs3.createReadStream(path3, options);
+      var stream2 = fs3.createReadStream(path4, options);
       this.emit("stream", stream2);
       stream2.pipe(res);
       function cleanup() {
@@ -23674,11 +23674,11 @@ var require_send = __commonJS({
         self.emit("end");
       });
     };
-    SendStream.prototype.type = function type(path3) {
+    SendStream.prototype.type = function type(path4) {
       var res = this.res;
       if (res.getHeader("Content-Type"))
         return;
-      var type2 = mime.lookup(path3);
+      var type2 = mime.lookup(path4);
       if (!type2) {
         debug("no content-type");
         return;
@@ -23687,9 +23687,9 @@ var require_send = __commonJS({
       debug("content-type %s", type2);
       res.setHeader("Content-Type", type2 + (charset ? "; charset=" + charset : ""));
     };
-    SendStream.prototype.setHeader = function setHeader(path3, stat2) {
+    SendStream.prototype.setHeader = function setHeader(path4, stat) {
       var res = this.res;
-      this.emit("headers", res, path3, stat2);
+      this.emit("headers", res, path4, stat);
       if (this._acceptRanges && !res.getHeader("Accept-Ranges")) {
         debug("accept ranges");
         res.setHeader("Accept-Ranges", "bytes");
@@ -23703,12 +23703,12 @@ var require_send = __commonJS({
         res.setHeader("Cache-Control", cacheControl);
       }
       if (this._lastModified && !res.getHeader("Last-Modified")) {
-        var modified = stat2.mtime.toUTCString();
+        var modified = stat.mtime.toUTCString();
         debug("modified %s", modified);
         res.setHeader("Last-Modified", modified);
       }
       if (this._etag && !res.getHeader("ETag")) {
-        var val = etag(stat2);
+        var val = etag(stat);
         debug("etag %s", val);
         res.setHeader("ETag", val);
       }
@@ -23748,9 +23748,9 @@ var require_send = __commonJS({
       }
       return err instanceof Error ? createError(status, err, { expose: false }) : createError(status, err);
     }
-    function decode(path3) {
+    function decode(path4) {
       try {
-        return decodeURIComponent(path3);
+        return decodeURIComponent(path4);
       } catch (err) {
         return -1;
       }
@@ -24662,12 +24662,12 @@ var require_utils2 = __commonJS({
     var querystring = require("querystring");
     exports2.etag = createETagGenerator({ weak: false });
     exports2.wetag = createETagGenerator({ weak: true });
-    exports2.isAbsolute = function(path2) {
-      if ("/" === path2[0])
+    exports2.isAbsolute = function(path3) {
+      if ("/" === path3[0])
         return true;
-      if (":" === path2[1] && ("\\" === path2[2] || "/" === path2[2]))
+      if (":" === path3[1] && ("\\" === path3[2] || "/" === path3[2]))
         return true;
-      if ("\\\\" === path2.substring(0, 2))
+      if ("\\\\" === path3.substring(0, 2))
         return true;
     };
     exports2.flatten = deprecate.function(
@@ -24880,7 +24880,7 @@ var require_application = __commonJS({
     };
     app.use = function use(fn) {
       var offset = 0;
-      var path2 = "/";
+      var path3 = "/";
       if (typeof fn !== "function") {
         var arg = fn;
         while (Array.isArray(arg) && arg.length !== 0) {
@@ -24888,7 +24888,7 @@ var require_application = __commonJS({
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path2 = fn;
+          path3 = fn;
         }
       }
       var fns = flatten(slice2.call(arguments, offset));
@@ -24899,12 +24899,12 @@ var require_application = __commonJS({
       var router = this._router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router.use(path2, fn2);
+          return router.use(path3, fn2);
         }
-        debug(".use app under %s", path2);
-        fn2.mountpath = path2;
+        debug(".use app under %s", path3);
+        fn2.mountpath = path3;
         fn2.parent = this;
-        router.use(path2, function mounted_app(req, res, next) {
+        router.use(path3, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             setPrototypeOf(req, orig.request);
@@ -24916,9 +24916,9 @@ var require_application = __commonJS({
       }, this);
       return this;
     };
-    app.route = function route(path2) {
+    app.route = function route(path3) {
       this.lazyrouter();
-      return this._router.route(path2);
+      return this._router.route(path3);
     };
     app.engine = function engine(ext, fn) {
       if (typeof fn !== "function") {
@@ -24969,7 +24969,7 @@ var require_application = __commonJS({
       }
       return this;
     };
-    app.path = function path2() {
+    app.path = function path3() {
       return this.parent ? this.parent.path() + this.mountpath : "";
     };
     app.enabled = function enabled(setting) {
@@ -24985,19 +24985,19 @@ var require_application = __commonJS({
       return this.set(setting, false);
     };
     methods.forEach(function(method) {
-      app[method] = function(path2) {
+      app[method] = function(path3) {
         if (method === "get" && arguments.length === 1) {
-          return this.set(path2);
+          return this.set(path3);
         }
         this.lazyrouter();
-        var route = this._router.route(path2);
+        var route = this._router.route(path3);
         route[method].apply(route, slice2.call(arguments, 1));
         return this;
       };
     });
-    app.all = function all(path2) {
+    app.all = function all(path3) {
       this.lazyrouter();
-      var route = this._router.route(path2);
+      var route = this._router.route(path3);
       var args2 = slice2.call(arguments, 1);
       for (var i = 0; i < methods.length; i++) {
         route[methods[i]].apply(route, args2);
@@ -25769,7 +25769,7 @@ var require_request = __commonJS({
       var subdomains2 = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
       return subdomains2.slice(offset);
     });
-    defineGetter(req, "path", function path2() {
+    defineGetter(req, "path", function path3() {
       return parse2(this).pathname;
     });
     defineGetter(req, "hostname", function hostname() {
@@ -26073,7 +26073,7 @@ var require_response = __commonJS({
     var http = require("http");
     var isAbsolute = require_utils2().isAbsolute;
     var onFinished = require_on_finished();
-    var path2 = require("path");
+    var path3 = require("path");
     var statuses = require_statuses();
     var merge = require_utils_merge();
     var sign = require_cookie_signature().sign;
@@ -26082,9 +26082,9 @@ var require_response = __commonJS({
     var setCharset = require_utils2().setCharset;
     var cookie = require_cookie();
     var send = require_send();
-    var extname = path2.extname;
+    var extname = path3.extname;
     var mime = send.mime;
-    var resolve = path2.resolve;
+    var resolve = path3.resolve;
     var vary = require_vary();
     var res = Object.create(http.ServerResponse.prototype);
     module2.exports = res;
@@ -26262,26 +26262,26 @@ var require_response = __commonJS({
       this.type("txt");
       return this.send(body);
     };
-    res.sendFile = function sendFile(path3, options, callback) {
+    res.sendFile = function sendFile(path4, options, callback) {
       var done = callback;
       var req = this.req;
       var res2 = this;
       var next = req.next;
       var opts = options || {};
-      if (!path3) {
+      if (!path4) {
         throw new TypeError("path argument is required to res.sendFile");
       }
-      if (typeof path3 !== "string") {
+      if (typeof path4 !== "string") {
         throw new TypeError("path must be a string to res.sendFile");
       }
       if (typeof options === "function") {
         done = options;
         opts = {};
       }
-      if (!opts.root && !isAbsolute(path3)) {
+      if (!opts.root && !isAbsolute(path4)) {
         throw new TypeError("path must be absolute or specify root to res.sendFile");
       }
-      var pathname = encodeURI(path3);
+      var pathname = encodeURI(path4);
       var file = send(req, pathname, opts);
       sendfile(res2, file, opts, function(err) {
         if (done)
@@ -26293,7 +26293,7 @@ var require_response = __commonJS({
         }
       });
     };
-    res.sendfile = function(path3, options, callback) {
+    res.sendfile = function(path4, options, callback) {
       var done = callback;
       var req = this.req;
       var res2 = this;
@@ -26303,7 +26303,7 @@ var require_response = __commonJS({
         done = options;
         opts = {};
       }
-      var file = send(req, path3, opts);
+      var file = send(req, path4, opts);
       sendfile(res2, file, opts, function(err) {
         if (done)
           return done(err);
@@ -26318,7 +26318,7 @@ var require_response = __commonJS({
       res.sendfile,
       "res.sendfile: Use res.sendFile instead"
     );
-    res.download = function download(path3, filename, options, callback) {
+    res.download = function download(path4, filename, options, callback) {
       var done = callback;
       var name = filename;
       var opts = options || null;
@@ -26335,7 +26335,7 @@ var require_response = __commonJS({
         opts = filename;
       }
       var headers = {
-        "Content-Disposition": contentDisposition(name || path3)
+        "Content-Disposition": contentDisposition(name || path4)
       };
       if (opts && opts.headers) {
         var keys = Object.keys(opts.headers);
@@ -26348,7 +26348,7 @@ var require_response = __commonJS({
       }
       opts = Object.create(opts);
       opts.headers = headers;
-      var fullPath = !opts.root ? resolve(path3) : path3;
+      var fullPath = !opts.root ? resolve(path4) : path4;
       return this.sendFile(fullPath, opts, done);
     };
     res.contentType = res.type = function contentType(type) {
@@ -26647,11 +26647,11 @@ var require_serve_static = __commonJS({
         }
         var forwardError = !fallthrough;
         var originalUrl = parseUrl.original(req);
-        var path2 = parseUrl(req).pathname;
-        if (path2 === "/" && originalUrl.pathname.substr(-1) !== "/") {
-          path2 = "";
+        var path3 = parseUrl(req).pathname;
+        if (path3 === "/" && originalUrl.pathname.substr(-1) !== "/") {
+          path3 = "";
         }
-        var stream = send(req, path2, opts);
+        var stream = send(req, path3, opts);
         stream.on("directory", onDirectory);
         if (setHeaders) {
           stream.on("headers", setHeaders);
@@ -33326,11 +33326,11 @@ var require_server = __commonJS({
        * @protected
        */
       _computePath(options) {
-        let path2 = (options.path || "/engine.io").replace(/\/$/, "");
+        let path3 = (options.path || "/engine.io").replace(/\/$/, "");
         if (options.addTrailingSlash !== false) {
-          path2 += "/";
+          path3 += "/";
         }
-        return path2;
+        return path3;
       }
       /**
        * Returns a list of available transports for upgrade given a certain transport.
@@ -33835,10 +33835,10 @@ var require_server = __commonJS({
        * @api public
        */
       attach(server, options = {}) {
-        const path2 = this._computePath(options);
+        const path3 = this._computePath(options);
         const destroyUpgradeTimeout = options.destroyUpgradeTimeout || 1e3;
         function check(req) {
-          return path2 === req.url.slice(0, path2.length);
+          return path3 === req.url.slice(0, path3.length);
         }
         const listeners = server.listeners("request").slice(0);
         server.removeAllListeners("request");
@@ -33846,7 +33846,7 @@ var require_server = __commonJS({
         server.on("listening", this.init.bind(this));
         server.on("request", (req, res) => {
           if (check(req)) {
-            debug('intercepting request for path "%s"', path2);
+            debug('intercepting request for path "%s"', path3);
             this.handleRequest(req, res);
           } else {
             let i = 0;
@@ -34694,8 +34694,8 @@ var require_userver = __commonJS({
        * @param options
        */
       attach(app, options = {}) {
-        const path2 = this._computePath(options);
-        app.any(path2, this.handleRequest.bind(this)).ws(path2, {
+        const path3 = this._computePath(options);
+        app.any(path3, this.handleRequest.bind(this)).ws(path3, {
           compression: options.compression,
           idleTimeout: options.idleTimeout,
           maxBackpressure: options.maxBackpressure,
@@ -38382,7 +38382,7 @@ var require_dist2 = __commonJS({
     var zlib_1 = require("zlib");
     var accepts = require_accepts();
     var stream_1 = require("stream");
-    var path2 = require("path");
+    var path3 = require("path");
     var engine_io_1 = require_engine_io();
     var client_1 = require_client();
     var events_1 = require("events");
@@ -38572,7 +38572,7 @@ var require_dist2 = __commonJS({
             res.writeHeader("cache-control", "public, max-age=0");
             res.writeHeader("content-type", "application/" + (isMap ? "json" : "javascript") + "; charset=utf-8");
             res.writeHeader("etag", expectedEtag);
-            const filepath = path2.join(__dirname, "../client-dist/", filename);
+            const filepath = path3.join(__dirname, "../client-dist/", filename);
             (0, uws_1.serveFile)(res, filepath);
           });
         }
@@ -38654,7 +38654,7 @@ var require_dist2 = __commonJS({
        * @private
        */
       static sendFile(filename, req, res) {
-        const readStream = (0, fs_1.createReadStream)(path2.join(__dirname, "../client-dist/", filename));
+        const readStream = (0, fs_1.createReadStream)(path3.join(__dirname, "../client-dist/", filename));
         const encoding = accepts(req).encodings(["br", "gzip", "deflate"]);
         const onError = (err) => {
           if (err) {
@@ -39387,6 +39387,7 @@ var ControllerChannel = class extends Channel {
           if (!m.keepAlive)
             this._cbQueue.delete(m.tk);
           cb(m);
+          console.log("Callback:", m);
         }
       } else {
         this.dispatchCtlMessage(m);
@@ -39404,7 +39405,7 @@ var ControllerChannel = class extends Channel {
         break;
       }
       case "D" /* DISPOSE */: {
-        this._ctl.closeChannel(msg.data);
+        this._ctl.closeChannel(msg.data, msg.code || 64033);
         msg.flag = 1 /* CALLBACK */;
         this.sendCtlMessage(msg);
         break;
@@ -39420,6 +39421,15 @@ var ControllerChannel = class extends Channel {
 var ChannelManager = class {
   _cid = 1;
   _hosts = [];
+  constructor(primaryHost, name) {
+    this._chnManName = name;
+    const controller = {
+      openChannel: this.createChannel.bind(this),
+      closeChannel: this.kill.bind(this)
+    };
+    this._ctlChannel = new ControllerChannel(primaryHost, controller);
+    this.bindHosts([primaryHost]);
+  }
   get primaryHost() {
     return this._hosts[0];
   }
@@ -39431,7 +39441,11 @@ var ChannelManager = class {
     return map2[0].host;
   }
   getNextCid() {
-    return this._cid++;
+    const t = Number(Date.now());
+    const u = this._cid++;
+    const r = Math.ceil(Math.random() * 65535);
+    const cid = t ^ u << 32 ^ r << 48;
+    return Math.abs(cid);
   }
   _ctlChannel;
   _packCount = 0;
@@ -39458,15 +39472,6 @@ var ChannelManager = class {
   }
   toString() {
     return this.name;
-  }
-  constructor(primaryHost, name) {
-    this._chnManName = name;
-    const controller = {
-      openChannel: this.createChannel.bind(this),
-      closeChannel: this.deleteChannel.bind(this)
-    };
-    this._ctlChannel = new ControllerChannel(primaryHost, controller);
-    this.bindHosts([primaryHost]);
   }
   bindHosts(hosts) {
     this._hosts.push(...hosts);
@@ -39500,27 +39505,36 @@ var ChannelManager = class {
   }
   async releaseConnection(chn, timeout = 5e3) {
     const tk = getNextRandomToken();
+    const cid = chn.cid;
     const msg = {
       cmd: "D" /* DISPOSE */,
       flag: 0 /* CONTROL */,
       tk,
-      data: chn.cid
+      data: cid
     };
+    this.kill(chn, 65521);
     return new Promise((res, rej) => {
       const timeoutHandle = setTimeout(() => {
         rej(new Error("timeout"));
       }, timeout || 5e3);
       this._ctlChannel.sendCtlMessage(msg, () => {
         clearTimeout(timeoutHandle);
-        this.deleteChannel(chn);
-        chn.destroy();
         res();
       });
     });
   }
-  kill(chn) {
-    this.deleteChannel(chn);
+  kill(chn, code) {
+    if (typeof chn === "number") {
+      chn = this.get(chn);
+      if (!chn)
+        return;
+    }
+    this._channels.delete(chn.cid);
     chn.destroy();
+    console.log(
+      `[ChnMan] Channel <${chn.cid}> destroyed`,
+      `0x${code.toString(16)}`
+    );
   }
   get(id) {
     return this._channels.get(id);
@@ -39546,9 +39560,6 @@ var ChannelManager = class {
     const channel = new Channel(cid, this.bestHost);
     this._channels.set(cid, channel);
     return channel;
-  }
-  deleteChannel(chn) {
-    this._channels.delete(chn.cid);
   }
   async destroy() {
     this.primaryHost.destroy();
@@ -39921,7 +39932,7 @@ var ProxyServer = class {
         console.log("ERROR", e);
         chn.push(null);
       });
-      sock.once("close", () => this._chnManager.kill(chn));
+      sock.once("close", () => this._chnManager.kill(chn, 4));
       chn.pipe(sock);
       sock.pipe(chn);
     } catch (e) {
@@ -39989,37 +40000,55 @@ var ProxyServer = class {
 // src/utils/help.ts
 function printUsage() {
   console.log(`Usage: node ${process.argv[1]} <command> [options]`);
-  console.log("General options:");
-  console.log(`  --serial-port, -s <path>`);
-  console.log(`    Specify the serial port to connect.`);
-  console.log(`    Default: . (Use the first available port)`);
-  console.log(`  --baud-rate, -b <baudRate>`);
-  console.log(`    Specify the baud rate.`);
-  console.log(`    Default: 1600000`);
-  console.log(``);
-  console.log(`Commands:`);
-  console.log(`  list`);
-  console.log(`    List all available serial ports.`);
-  console.log(`  proxy [options]`);
-  console.log(`    Start the intermedia proxy server.`);
-  console.log(`    Options:`);
-  console.log(`      --listen, -l <ip>`);
-  console.log(`        Specify the IP address to listen.`);
-  console.log(`        Default: 0.0.0.0`);
-  console.log(`      --port, -p <port>`);
-  console.log(`        Specify the port to listen.`);
-  console.log(`        Default: 13808`);
-  console.log(`  host [options]`);
-  console.log(`    Start the host proxy server.`);
-  console.log(`  msg`);
-  console.log(`    Start messenger server.`);
-  console.log(`    Options:`);
-  console.log(`      --listen, -l <ip>`);
-  console.log(`        Specify the IP address to listen.`);
-  console.log(`        Default: 127.0.0.1`);
-  console.log(`      --port, -p <port>`);
-  console.log(`        Specify the port to listen.`);
-  console.log(`        Default: 13809`);
+  console.log(` 
+General options:
+  --serial-port=<path1, path2,...> | -s
+    Specify the serial ports to connect, use comma to separate multiple ports.
+
+    If multiple ports are specified, the first port will be used as the primary port, and 
+    load-balance will be enabled automatically.
+
+    ***
+    Note: Using multiple ports is not means to create a multi-channel, it's for load-balance.
+          You still can create multi-channel by using the same port multiple times.
+          Using multiple serial ports does not increase bandwidth, but it can significantly improve concurrency capabilities.
+    ***
+
+    Default: . (Use the first available port)  
+
+  --baud-rate=<baudRate1, baudRate2,...> | -b 
+    Specify the baud rates, use comma to separate multiple rates for different ports.
+    Default: 1600000
+
+Commands:
+  list
+    List all available serial ports.
+
+  proxy [options]
+    Start the proxy endpoint, which the traffic outlet.
+
+  host [options]
+    Start the intermedia proxy host. All requests will be forwarded to the proxy endpoint through the serial ports binding.
+    Options:
+      --listen=<ip>, -l
+        Specify the IP address to listen.      
+        Default: 0.0.0.0
+
+      --port=<port>, -p
+        Specify the port to listen.
+        Default: 13808
+
+  msg [options]
+    Send text/image/file to the specified channel. Or start remote shell.
+    Options:
+      --listen=<ip>, -l
+        Specify the IP address to listen.      
+        Default: 127.0.0.1
+        
+      --port=<port>, -p
+        Specify the port to listen.
+        Default: 13809
+  `);
 }
 
 // src/utils/options.ts
@@ -40100,7 +40129,7 @@ var ProxyEndPoint = class {
         if (channel) {
           redirectConnectToChn(opt, channel, () => {
             console.log("[ProxyEndPoint/Socket]", cid, "Channel is closing.");
-            this._channelManager.kill(channel);
+            this._channelManager.kill(channel, 1);
           });
         } else {
           console.log("[ProxyEndPoint/Socket]", "Channel not found:", cid);
@@ -40120,9 +40149,9 @@ var ProxyEndPoint = class {
         if (channel) {
           redirectRequestToChn(opt, channel, () => {
             console.log("[ProxyEndPoint/Request]", cid, "Channel is closing.");
-            this._channelManager.kill(channel);
+            this._channelManager.kill(channel, 2);
           });
-          channel.once("finish", () => this._channelManager.kill(channel));
+          channel.once("finish", () => this._channelManager.kill(channel, 3));
         } else {
           console.log("[ProxyEndPoint/Request]", "Channel not found:", cid);
         }
@@ -40260,36 +40289,45 @@ function notFound(res) {
 }
 
 // src/service/messenger.ts
-var import_os = __toESM(require("os"));
-var import_child_process = require("child_process");
-var import_path = __toESM(require("path"));
+var import_os2 = __toESM(require("os"));
+var import_child_process2 = require("child_process");
+var import_path2 = __toESM(require("path"));
 
 // src/utils/fsys.ts
 var import_fs = __toESM(require("fs"));
 var import_crypto = __toESM(require("crypto"));
-async function path_type_of(path2) {
-  return new Promise((resolve) => {
-    (0, import_fs.stat)(path2, (err, s) => {
+var import_os = __toESM(require("os"));
+var import_child_process = require("child_process");
+var import_path = __toESM(require("path"));
+async function stat_of(path3) {
+  return new Promise((resolve, reject) => {
+    import_fs.default.stat(path3, (err, stats) => {
       if (err) {
-        resolve(0 /* NOT_FOUND */);
+        reject(err);
       } else {
-        if (s.isFile()) {
-          resolve(1 /* FILE */);
-        } else if (s.isDirectory()) {
-          resolve(2 /* DIR */);
-        } else {
-          resolve(3 /* UNKNOWN */);
-        }
+        resolve(stats);
       }
     });
   });
 }
-async function d_exists(path2) {
-  return await path_type_of(path2) === 2 /* DIR */;
+async function path_type_of(path3) {
+  const stat = await stat_of(path3);
+  if (stat.isFile()) {
+    return 1 /* FILE */;
+  } else if (stat.isDirectory()) {
+    return 2 /* DIR */;
+  } else if (stat.isBlockDevice() || stat.isCharacterDevice()) {
+    return 3 /* UNIX_DEVICE */;
+  } else {
+    return 5 /* UNKNOWN */;
+  }
 }
-async function mkdir(path2) {
+async function d_exists(path3) {
+  return await path_type_of(path3) === 2 /* DIR */;
+}
+async function mkdir(path3) {
   return new Promise((resolve) => {
-    import_fs.default.mkdir(path2, (err) => {
+    import_fs.default.mkdir(path3, (err) => {
       if (err) {
         if (err.errno === -4075) {
           resolve(true);
@@ -40305,13 +40343,13 @@ async function mkdir(path2) {
 function hash(data, algorithm = "sha1") {
   return new Promise((resolve, reject) => {
     if (data instanceof Buffer) {
-      calcBufferSha1(data, algorithm).then((hash2) => {
+      hash_buffer(data, algorithm).then((hash2) => {
         resolve(hash2);
       }).catch((err) => {
         reject(err);
       });
     } else {
-      calcFileSha1(data, algorithm).then((hash2) => {
+      hash_file(data, algorithm).then((hash2) => {
         resolve(hash2);
       }).catch((err) => {
         reject(err);
@@ -40319,9 +40357,9 @@ function hash(data, algorithm = "sha1") {
     }
   });
 }
-function try_rm(path2, recursive = true) {
+function try_rm(path3, recursive = true) {
   return new Promise((resolve) => {
-    import_fs.default.rm(path2, { recursive }, (err) => {
+    import_fs.default.rm(path3, { recursive }, (err) => {
       if (err) {
         resolve(false);
       } else {
@@ -40330,35 +40368,110 @@ function try_rm(path2, recursive = true) {
     });
   });
 }
-function open_write(path2) {
-  return import_fs.default.createWriteStream(path2);
+function open_write(path3) {
+  return import_fs.default.createWriteStream(path3);
 }
-async function calcBufferSha1(buffer, algorithm) {
+async function hash_buffer(buffer, algorithm) {
   return await new Promise((resolve) => {
     const hash2 = import_crypto.default.createHash(algorithm);
     hash2.update(buffer);
     resolve(hash2.digest("hex"));
   });
 }
-async function calcFileSha1(path2, algorithm) {
+async function hash_file(path3, algorithm) {
   const hash2 = import_crypto.default.createHash(algorithm);
-  const stream = import_fs.default.createReadStream(path2);
+  const stream = import_fs.default.createReadStream(path3);
   for await (const chunk of stream) {
     hash2.update(chunk);
   }
   return hash2.digest("hex");
 }
+async function enum_path(pathname) {
+  const stat = await stat_of(pathname);
+  if (!stat.isDirectory())
+    return Promise.resolve([]);
+  const parent = import_path.default.dirname(pathname.toString());
+  return new Promise((resolve, reject) => {
+    import_fs.default.readdir(pathname, { withFileTypes: true }, async (err, files) => {
+      if (err) {
+        reject(err);
+      } else {
+        const children = [];
+        for (const file of files) {
+          if (!file.isFile() && !file.isDirectory())
+            continue;
+          const type = file.isDirectory() ? 2 /* DIR */ : 1 /* FILE */;
+          const stat2 = await stat_of(file.path);
+          const size = type === 2 /* DIR */ ? -1 : stat2.size;
+          const fso = {
+            name: file.name,
+            type,
+            size,
+            path: file.path,
+            parent,
+            lastModified: stat2.mtime,
+            created: stat2.ctime
+          };
+          children.push(fso);
+        }
+        resolve(children);
+      }
+    });
+  });
+}
+async function query_roots() {
+  if (import_os.default.platform() !== "win32")
+    return Promise.resolve([]);
+  return new Promise((resolve, reject) => {
+    (0, import_child_process.exec)("wmic logicaldisk get caption", async (err, stdout, stderr) => {
+      if (err) {
+        reject(err);
+      } else {
+        const roots = [];
+        const lines = stdout.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+        for (const line of lines) {
+          const stat = await stat_of(line);
+          const fso = {
+            name: line,
+            type: 2 /* DIR */,
+            size: -1,
+            path: line,
+            parent: ".",
+            lastModified: stat.mtime,
+            created: stat.ctime
+          };
+          roots.push(fso);
+        }
+        resolve(roots);
+      }
+    });
+  });
+}
 
 // src/service/messenger.ts
-var version = "0.0.1";
+var version = "1.0.1";
 var root = __dirname;
-var static_root = import_path.default.resolve(root, "app", "static");
-var static_root2 = import_path.default.resolve(import_os.default.homedir(), "sp2mux-files");
+var static_root = import_path2.default.resolve(root, "app", "static");
+var static_root2 = import_path2.default.resolve(import_os2.default.homedir(), "sp2mux-files");
 var Messenger = class {
   _host;
   _channelManager;
   _systemChannels;
-  _tokenMap = /* @__PURE__ */ new Map();
+  _msgMans = /* @__PURE__ */ new Map();
+  release(cid) {
+    this._msgMans.delete(cid);
+  }
+  isLocked(cid) {
+    return this._msgMans.has(cid);
+  }
+  lock(mc) {
+    if (this._msgMans.has(mc.channel.cid))
+      throw new Error("channel locked");
+    this._msgMans.set(mc.channel.cid, mc);
+  }
+  tryGet(cid) {
+    return this._msgMans.get(cid) || null;
+  }
   constructor(sp) {
     this._host = new PhysicalPort(sp);
     this._channelManager = new ChannelManager(this._host, "messenger");
@@ -40408,10 +40521,8 @@ var Messenger = class {
         break;
       }
       case "&01" /* SHELL */: {
-        const { command: command2, cid } = msg.data;
-        const msgChannel = this._tokenMap.get(cid);
-        console.log("shell command", cid, `\`${command2}\``);
-        if (!msgChannel || !command2) {
+        const { command: command2 } = msg.data;
+        if (!command2) {
           msg.flag = 1 /* CALLBACK */;
           msg.data = { message: "invalid command", success: false };
           sb(msg);
@@ -40419,8 +40530,8 @@ var Messenger = class {
         }
         const sChannel = await this.requireSystemChannel();
         try {
-          const child = (0, import_child_process.spawn)(command2, {
-            cwd: import_os.default.homedir(),
+          const child = (0, import_child_process2.spawn)(command2, {
+            cwd: import_os2.default.homedir(),
             shell: true,
             stdio: "pipe"
           });
@@ -40434,13 +40545,19 @@ var Messenger = class {
             this.releaseSystemChannel(sChannel);
             console.log("shell command exit", code, signal);
           });
+          sChannel.once("end", () => {
+            try {
+              console.log("shell channel closed, process exiting...");
+              child.kill();
+            } catch (e) {
+            }
+          });
           msg.flag = 1 /* CALLBACK */;
           msg.data = {
             message: "established",
             success: true,
             cid: sChannel.cid
           };
-          msgChannel.childProcess = child;
           sb(msg);
         } catch (e) {
           msg.flag = 1 /* CALLBACK */;
@@ -40449,42 +40566,34 @@ var Messenger = class {
         }
         break;
       }
-      case "&03" /* IMAGE */:
-      case "&02" /* FILE */: {
+      case "&03" /* REC_IMAGE */:
+      case "&02" /* REC_FILE */: {
         const { name, cid, sha1 } = msg.data;
-        const msgChannel = this._tokenMap.get(cid);
-        if (!msgChannel) {
-          msg.flag = 1 /* CALLBACK */;
-          msg.data = null;
-          sb(msg);
-          return;
-        }
+        const msgChannel = cid ? this.tryGet(cid) || null : null;
         const ext = "." + name.split(".").pop() || "bin";
         const fileName = `${randomToken()}${ext}`;
         const uri = `/files/${fileName}`;
-        const fullName = import_path.default.resolve(static_root2, fileName);
+        const fullName = import_path2.default.resolve(static_root2, fileName);
         await d_exists(static_root2).then((exists) => exists || mkdir(static_root2));
         console.log("ready to receive", sha1, fullName);
         const fChannel = await this.requireSystemChannel();
         console.log("file channel established", fChannel.cid);
         const writable = open_write(fullName);
         fChannel.pipe(writable);
-        msg.flag = 1 /* CALLBACK */;
-        msg.data = fChannel.cid;
         fChannel.once("end", async () => {
           writable.close();
           this.releaseSystemChannel(fChannel);
           const sha1File = await hash(fullName);
           if (sha1File !== sha1) {
             try_rm(fullName);
-            msgChannel.queue.enqueue({
+            msgChannel?.queue.enqueue({
               type: 0 /* Text */,
-              content: "[\u6587\u4EF6/\u56FE\u7247\u4F20\u8F93\u5931\u8D25\uFF1A\u6587\u4EF6\u6821\u9A8C\u5931\u8D25]",
+              content: "[\u6587\u4EF6/\u56FE\u7247\u4F20\u8F93\u5931\u8D25\uFF1A\u6587\u4EF6\u6821\u9A8C\u9519\u8BEF]",
               mineType: "text/plain"
             });
           } else {
-            msgChannel.queue.enqueue({
-              type: msg.cmd === "&03" /* IMAGE */ ? 2 /* Image */ : 1 /* File */,
+            msgChannel?.queue.enqueue({
+              type: msg.cmd === "&03" /* REC_IMAGE */ ? 2 /* Image */ : 1 /* File */,
               content: uri,
               fileName: name,
               // original file name
@@ -40492,6 +40601,16 @@ var Messenger = class {
             });
           }
         });
+        msg.flag = 1 /* CALLBACK */;
+        msg.data = fChannel.cid;
+        sb(msg);
+        break;
+      }
+      case "&04" /* READ_DIR */: {
+        const path3 = msg.data;
+        const objs = path3 ? await enum_path(path3) : await query_roots();
+        msg.flag = 1 /* CALLBACK */;
+        msg.data = objs;
         sb(msg);
         break;
       }
@@ -40543,61 +40662,26 @@ var Messenger = class {
     } else {
       console.log(socket.id, "connected", ret);
     }
-    socket.on("rpc", this.rpc.bind(this, socket));
-  }
-  rpc(socket, cmd, ticket, data) {
-    switch (cmd) {
-      case "send": {
-        const ret = this.onMessage(data);
-        socket.emit("rpc", ticket, ret);
-        break;
-      }
-      default:
-        socket.emit("rpc", ticket, {
-          success: false,
-          message: "unknown command"
-        });
-        break;
-    }
   }
   async connectSocketToChannel(socket, cid, token) {
-    const msgChn = this._tokenMap.get(cid);
-    if (!msgChn) {
+    const msgMan = this.tryGet(cid);
+    if (!msgMan) {
       return { success: false, message: "channel not found" };
     }
-    if (msgChn.token !== token) {
+    if (msgMan.token !== token) {
       return { success: false, message: "unauthorized" };
     }
-    if (msgChn.socket) {
-      return { success: false, message: "access denied" };
+    if (msgMan.socket) {
+      msgMan.socket.removeAllListeners();
+      msgMan.socket.disconnect();
+      msgMan.socket = null;
     }
-    msgChn.socket = socket;
-    msgChn.queue.onItemQueued = (item) => {
+    msgMan.socket = socket;
+    msgMan.queue.onItemQueued = (item) => {
       socket.emit("data", item);
       return false;
     };
-    socket.once("disconnect", () => {
-      try {
-        this.close(msgChn);
-        console.log(`channel ${cid} closed: client disconnect.`);
-      } catch (e) {
-        console.error(e);
-      }
-    });
     return { success: true, message: "ok" };
-  }
-  onMessage({
-    msg,
-    token,
-    cid
-  }) {
-    const msgChn = this._tokenMap.get(cid);
-    if (msgChn && msgChn.token === token) {
-      msgChn.channel.write(Buffer.from(JSON.stringify(msg) + "\r\n", "utf8"));
-      return { success: true, message: "ok" };
-    } else {
-      return { success: false, message: "access denied" };
-    }
   }
   // ============== http handlers ==============
   async getInfo(req, res) {
@@ -40624,16 +40708,34 @@ var Messenger = class {
   async openChannel(req, res) {
     try {
       const { cid } = req.body;
-      if (cid && this._tokenMap.has(cid)) {
-        fail(res, "channel already exists");
+      if (cid && this.isLocked(cid)) {
+        success(res, {
+          token: this.tryGet(cid).token,
+          cid
+        });
         return;
       }
-      const channel = cid ? this._channelManager.use(cid) : await this._channelManager.requireConnection();
+      const channel = cid ? (
+        // use existing channel
+        this._channelManager.use(cid)
+      ) : (
+        // create new channel
+        await this._channelManager.requireConnection()
+      );
       const queue = new BlockQueue(1e4);
       const token = getNextRandomToken().padStart(6, "a");
-      channel.once("close", () => {
-        this._tokenMap.delete(channel.cid);
-        this._channelManager.releaseConnection(channel);
+      channel.once("end", () => {
+        const msgChan = this.tryGet(channel.cid);
+        if (!msgChan) {
+          console.log("Channel already released:", channel.cid);
+          return;
+        }
+        console.log("Closing channel:", channel.cid);
+        msgChan?.socket?.emit("error", {
+          success: false,
+          message: "channel closed"
+        });
+        this.release(channel.cid);
       });
       const parser = channel.pipe(new import_serialport2.ReadlineParser());
       parser.on("data", (line) => {
@@ -40647,7 +40749,7 @@ var Messenger = class {
           });
         }
       });
-      this._tokenMap.set(channel.cid, { token, channel, queue });
+      this.lock({ token, channel, queue });
       success(res, { token, cid: channel.cid });
     } catch (e) {
       console.log(e);
@@ -40672,17 +40774,17 @@ var Messenger = class {
       badRequest(res, "invalid channel id");
       return;
     }
-    const channel = this._tokenMap.get(channelId);
-    if (!channel) {
-      notFound(res);
+    const msgMan = this.tryGet(channelId);
+    if (!msgMan) {
+      success(res, "channel released already");
       return;
     }
-    if (channel.token !== token) {
+    if (msgMan.token !== token) {
       accessDenied(res);
       return;
     }
     try {
-      this.close(channel);
+      this.close(msgMan);
       success(res, "ok");
     } catch (e) {
       internalError(res, e.message);
@@ -40708,8 +40810,8 @@ var Messenger = class {
       badRequest(res, "missing content");
       return;
     }
-    const { channel, token: cToken } = this._tokenMap.get(cid);
-    if (!channel) {
+    const { channel, token: cToken } = this.tryGet(cid) || {};
+    if (!channel || channel.destroyed) {
       notFound(res);
       return;
     }
@@ -40760,7 +40862,7 @@ var Messenger = class {
       badRequest(res, "invalid channel id");
       return;
     }
-    const msgChannel = this._tokenMap.get(channelId);
+    const msgChannel = this.tryGet(channelId);
     if (!msgChannel) {
       notFound(res);
       return;
@@ -40843,7 +40945,7 @@ var Messenger = class {
       badRequest(res, "invalid channel id");
       return;
     }
-    const msgChannel = this._tokenMap.get(channelId);
+    const msgChannel = this.tryGet(channelId);
     if (!msgChannel) {
       notFound(res);
       return;
@@ -40853,51 +40955,37 @@ var Messenger = class {
       return;
     }
     try {
-      await this.sendingBuffer("&03" /* IMAGE */, name, channelId, buffer);
+      await this.buffer("&03" /* REC_IMAGE */, name, buffer, channelId);
       success(res, "ok");
     } catch (e) {
       internalError(res, e.message);
     }
   }
   /**
-   * post /raw/file/:cid?token=xxx&name=xxx
+   * post /raw/file/:cid?name=xxx
    * @param req
    * @param res
    */
   async postFile(req, res) {
     const { cid } = req.params;
-    const { token, name } = req.query;
+    const { name } = req.query;
     const buffer = req.body;
     if (!name) {
       badRequest(res, "missing name");
       return;
     }
-    if (!token) {
-      badRequest(res, "missing token");
-      return;
-    }
-    const channelId = parseInt(cid);
+    let channelId = parseInt(cid);
     if (isNaN(channelId)) {
-      badRequest(res, "invalid channel id");
-      return;
-    }
-    const msgChannel = this._tokenMap.get(channelId);
-    if (!msgChannel) {
-      notFound(res);
-      return;
-    }
-    if (msgChannel.token !== token) {
-      accessDenied(res);
-      return;
+      channelId = null;
     }
     try {
-      await this.sendingBuffer("&02" /* FILE */, name, channelId, buffer);
+      await this.buffer("&02" /* REC_FILE */, name, buffer, channelId);
       success(res, "ok");
     } catch (e) {
       internalError(res, e.message);
     }
   }
-  async sendingBuffer(cmd, name, channelId, buffer) {
+  async buffer(cmd, name, buffer, channelId) {
     const sha1 = await hash(buffer);
     return new Promise((resolve, reject) => {
       this._channelManager.controller.sendCtlMessage(
@@ -40920,7 +41008,6 @@ var Messenger = class {
           fChannel.write(buffer, () => {
             fChannel.finish();
             resolve();
-            this._channelManager.kill(fChannel);
           });
         }
       );
@@ -40944,7 +41031,7 @@ var Messenger = class {
       badRequest(res, "invalid channel id");
       return;
     }
-    const channel = this._tokenMap.get(channelId);
+    const channel = this.tryGet(channelId);
     if (!channel) {
       notFound(res);
       return;
@@ -40964,34 +41051,34 @@ var Messenger = class {
       }
     }
   }
-  close(channel) {
-    if (channel.socket) {
-      channel.socket.disconnect();
-      channel.socket = null;
+  close(msgMan) {
+    if (msgMan.socket) {
+      msgMan.socket.disconnect();
+      msgMan.socket = null;
     }
-    if (channel.childProcess) {
-      channel.childProcess.kill();
-      channel.childProcess = null;
+    if (msgMan.childProcess) {
+      msgMan.childProcess.kill();
+      msgMan.childProcess = null;
     }
-    if (channel.remoteShellChannelId) {
+    if (msgMan.remoteShellChannelId) {
       try {
-        const chn = this._channelManager.get(channel.remoteShellChannelId);
+        const chn = this._channelManager.get(msgMan.remoteShellChannelId);
         chn?.write("exit\r\n");
         chn?.write("exit\r\n");
       } catch (e) {
         console.log(e);
       }
     }
-    this._tokenMap.delete(channel.channel.cid);
-    this._channelManager.releaseConnection(channel.channel);
-    channel.queue.destroy();
-    channel.channel.destroy();
+    this.release(msgMan.channel.cid);
+    this._channelManager.releaseConnection(msgMan.channel);
+    msgMan.queue.destroy();
+    msgMan.channel.destroy();
   }
 };
-function infoHtml(version2, path2, baudRate) {
+function infoHtml(version2, path3, baudRate) {
   return `
 <p>Version: ${version2}</p>
-<p>Connected to ${path2}</p>
+<p>Connected to ${path3}</p>
 <p>Baud rate: ${baudRate}</p>`;
 }
 function randomToken() {

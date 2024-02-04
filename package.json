@@ -4,7 +4,8 @@
     "build": "node build.js",
     "msg": "node ./dist/index.js msg --serial-port=COM12 --baud-rate=6000000",
     "msg2": "node ./dist/index.js msg --serial-port=COM15 --baud-rate=6000000 --port=13810 --listen=127.0.0.1",
-    "start": "yarn build & node server.js"
+    "help!": "node ./dist/index.js help",
+    "test-msg-server": "yarn build & node server.js"
   },
   "dependencies": {
     "@types/node": "^20.11.4",

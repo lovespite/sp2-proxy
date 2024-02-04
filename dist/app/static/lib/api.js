@@ -144,48 +144,31 @@
 
     /**
      * @param {{
-     * stopSignal: AbortSignal,
+     * controller: AbortController,
      * cid: number,
      * token: string,
      * callback: (message: string) => void
      * }}} param0
      * @returns
      */
-    listenMessage: async function ({
-      stopSignal,
-      cid,
-      token,
-      callback,
-      legacy = false,
-    }) {
+    listenMessage: async function ({ controller, cid, token, callback }) {
       if (typeof callback !== "function")
         throw new Error("callback is not a function");
 
       console.log(cid, "listenMessage started");
 
-      if (legacy) {
-        await this.useLongPolling(stopSignal, cid, token, callback);
-      } else {
-        await this.useSocketIo(stopSignal, cid, token, callback);
-      }
+      await this.useSocketIo(cid, token, callback, controller);
 
       console.warn(cid, "listenMessage stopped");
     },
 
-    useLongPolling: async function (stopSignal, cid, token, callback) {
-      while (!stopSignal.aborted) {
-        const ret = await this.pullMessage(cid, token, 15000, stopSignal); // 15s
-        try {
-          if (ret) callback(ret);
-        } catch (e) {
-          console.error(e);
-        }
-
-        if (stopSignal.aborted) break;
-      }
-    },
-
-    useSocketIo: async function (stopSignal, cid, token, callback) {
+    /**
+     * @param {number} cid
+     * @param {string} token
+     * @param {Function} callback
+     * @param {AbortController} controller
+     */
+    useSocketIo: async function (cid, token, callback, controller) {
       const socket = io({
         query: {
           cid,
@@ -196,7 +179,7 @@
 
       socket.on("error", (msg) => {
         console.error(msg);
-        stopSignal.abort();
+        controller.abort();
         socket.close();
       });
 
@@ -205,7 +188,7 @@
       });
 
       await new Promise((resolve) => {
-        stopSignal.addEventListener("abort", () => {
+        controller.signal.addEventListener("abort", () => {
           socket.close();
           resolve();
         });

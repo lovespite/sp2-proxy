@@ -116,7 +116,7 @@ export class ProxyServer {
         chn.push(null);
       });
 
-      sock.once("close", () => this._chnManager.kill(chn));
+      sock.once("close", () => this._chnManager.kill(chn, 0x4));
 
       chn.pipe(sock);
       sock.pipe(chn);

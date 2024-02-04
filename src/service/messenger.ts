@@ -61,7 +61,24 @@ export class Messenger {
   private readonly _channelManager: ChannelManager;
   private readonly _systemChannels: Set<number>;
 
-  private readonly _tokenMap: Map<number, MessageChannel> = new Map();
+  private readonly _msgMans: Map<number, MessageChannel> = new Map();
+
+  private release(cid: number) {
+    this._msgMans.delete(cid);
+  }
+
+  private isLocked(cid: number) {
+    return this._msgMans.has(cid);
+  }
+
+  private lock(mc: MessageChannel) {
+    if (this._msgMans.has(mc.channel.cid)) throw new Error("channel locked");
+    this._msgMans.set(mc.channel.cid, mc);
+  }
+
+  private tryGet(cid: number): MessageChannel | null {
+    return this._msgMans.get(cid) || null;
+  }
 
   public constructor(sp: SerialPort) {
     this._host = new PhysicalPort(sp);
@@ -196,7 +213,7 @@ export class Messenger {
           sha1: string;
         };
 
-        const msgChannel = cid ? this._tokenMap.get(cid) || null : null;
+        const msgChannel = cid ? this.tryGet(cid) || null : null;
 
         const ext = "." + name.split(".").pop() || "bin";
 
@@ -216,9 +233,6 @@ export class Messenger {
 
         const writable = fsys.open_write(fullName);
         fChannel.pipe(writable);
-
-        msg.flag = CtlMessageFlag.CALLBACK;
-        msg.data = fChannel.cid;
 
         fChannel.once("end", async () => {
           writable.close();
@@ -247,6 +261,8 @@ export class Messenger {
           }
         });
 
+        msg.flag = CtlMessageFlag.CALLBACK;
+        msg.data = fChannel.cid;
         sb(msg);
         break;
       }
@@ -329,24 +345,6 @@ export class Messenger {
     } else {
       console.log(socket.id, "connected", ret);
     }
-
-    socket.on("rpc", this.rpc.bind(this, socket));
-  }
-
-  private rpc(socket: ws.Socket, cmd: string, ticket: string, data: any) {
-    switch (cmd) {
-      case "send": {
-        const ret = this.onMessage(data);
-        socket.emit("rpc", ticket, ret);
-        break;
-      }
-      default:
-        socket.emit("rpc", ticket, {
-          success: false,
-          message: "unknown command",
-        });
-        break;
-    }
   }
 
   private async connectSocketToChannel(
@@ -354,56 +352,40 @@ export class Messenger {
     cid: number,
     token: string
   ) {
-    const msgChn = this._tokenMap.get(cid);
+    const msgMan = this.tryGet(cid);
 
-    if (!msgChn) {
+    if (!msgMan) {
       return { success: false, message: "channel not found" };
     }
 
-    if (msgChn.token !== token) {
+    if (msgMan.token !== token) {
       return { success: false, message: "unauthorized" };
     }
 
-    if (msgChn.socket) {
-      return { success: false, message: "access denied" };
+    if (msgMan.socket) {
+      msgMan.socket.removeAllListeners();
+      msgMan.socket.disconnect();
+      msgMan.socket = null;
     }
 
-    msgChn.socket = socket;
-    msgChn.queue.onItemQueued = (item) => {
-      // console.log("received message:", item);
+    msgMan.socket = socket;
+    msgMan.queue.onItemQueued = (item) => {
       socket.emit("data", item);
-      return false; // no need to keep the item in the queue
+
+      // no need to keep the item in the queue since we handled it here
+      return false;
     };
 
-    socket.once("disconnect", () => {
-      try {
-        this.close(msgChn);
-        console.log(`channel ${cid} closed: client disconnect.`);
-      } catch (e) {
-        console.error(e);
-      }
-    });
+    // socket.once("disconnect", () => {
+    //   try {
+    //     this.close(msgMan);
+    //     console.log(`channel ${cid} closed: client disconnect.`);
+    //   } catch (e) {
+    //     console.error(e);
+    //   }
+    // });
 
     return { success: true, message: "ok" };
-  }
-
-  private onMessage({
-    msg,
-    token,
-    cid,
-  }: {
-    token: string;
-    cid: number;
-    msg: Message;
-  }) {
-    const msgChn = this._tokenMap.get(cid);
-    if (msgChn && msgChn.token === token) {
-      msgChn.channel.write(Buffer.from(JSON.stringify(msg) + "\r\n", "utf8"));
-
-      return { success: true, message: "ok" };
-    } else {
-      return { success: false, message: "access denied" };
-    }
   }
 
   // ============== http handlers ==============
@@ -438,21 +420,39 @@ export class Messenger {
     try {
       const { cid } = req.body as { cid: number | undefined };
 
-      if (cid && this._tokenMap.has(cid)) {
-        response.fail(res, "channel already exists");
+      if (cid && this.isLocked(cid)) {
+        response.success(res, {
+          token: this.tryGet(cid).token,
+          cid,
+        });
         return;
       }
 
       const channel = cid
-        ? this._channelManager.use(cid)
-        : await this._channelManager.requireConnection();
+        ? // use existing channel
+          this._channelManager.use(cid)
+        : // create new channel
+          await this._channelManager.requireConnection();
 
       const queue = new BlockQueue<Message>(10000);
       const token = getNextRandomToken().padStart(6, "a");
 
-      channel.once("close", () => {
-        this._tokenMap.delete(channel.cid);
-        this._channelManager.releaseConnection(channel);
+      channel.once("end", () => {
+        const msgChan = this.tryGet(channel.cid);
+        if (!msgChan) {
+          // already released}
+          console.log("Channel already released:", channel.cid);
+          return;
+        }
+
+        console.log("Closing channel:", channel.cid);
+
+        msgChan?.socket?.emit("error", {
+          success: false,
+          message: "channel closed",
+        });
+
+        this.release(channel.cid);
       });
 
       const parser = channel.pipe(new ReadlineParser());
@@ -468,7 +468,7 @@ export class Messenger {
         }
       });
 
-      this._tokenMap.set(channel.cid, { token, channel, queue });
+      this.lock({ token, channel, queue });
 
       response.success(res, { token, cid: channel.cid });
     } catch (e) {
@@ -498,19 +498,19 @@ export class Messenger {
       return;
     }
 
-    const channel = this._tokenMap.get(channelId);
-    if (!channel) {
-      response.notFound(res);
+    const msgMan = this.tryGet(channelId);
+    if (!msgMan) {
+      response.success(res, "channel released already");
       return;
     }
 
-    if (channel.token !== token) {
+    if (msgMan.token !== token) {
       response.accessDenied(res);
       return;
     }
 
     try {
-      this.close(channel);
+      this.close(msgMan);
       response.success(res, "ok");
     } catch (e) {
       response.internalError(res, e.message);
@@ -545,9 +545,9 @@ export class Messenger {
       return;
     }
 
-    const { channel, token: cToken } = this._tokenMap.get(cid);
+    const { channel, token: cToken } = this.tryGet(cid) || {};
 
-    if (!channel) {
+    if (!channel || channel.destroyed) {
       response.notFound(res);
       return;
     }
@@ -606,7 +606,7 @@ export class Messenger {
       response.badRequest(res, "invalid channel id");
       return;
     }
-    const msgChannel = this._tokenMap.get(channelId);
+    const msgChannel = this.tryGet(channelId);
 
     if (!msgChannel) {
       response.notFound(res);
@@ -706,7 +706,7 @@ export class Messenger {
       return;
     }
 
-    const msgChannel = this._tokenMap.get(channelId);
+    const msgChannel = this.tryGet(channelId);
 
     if (!msgChannel) {
       response.notFound(res);
@@ -787,7 +787,6 @@ export class Messenger {
             // console.log("file sent");
             fChannel.finish();
             resolve();
-            this._channelManager.kill(fChannel);
           });
         }
       );
@@ -815,7 +814,7 @@ export class Messenger {
       return;
     }
 
-    const channel = this._tokenMap.get(channelId);
+    const channel = this.tryGet(channelId);
     if (!channel) {
       response.notFound(res);
       return;
@@ -840,23 +839,23 @@ export class Messenger {
     }
   }
 
-  private close(channel: MessageChannel) {
-    if (channel.socket) {
+  private close(msgMan: MessageChannel) {
+    if (msgMan.socket) {
       // close websocket
-      channel.socket.disconnect();
-      channel.socket = null;
+      msgMan.socket.disconnect();
+      msgMan.socket = null;
     }
 
-    if (channel.childProcess) {
+    if (msgMan.childProcess) {
       // kill shell process
-      channel.childProcess.kill();
-      channel.childProcess = null;
+      msgMan.childProcess.kill();
+      msgMan.childProcess = null;
     }
 
-    if (channel.remoteShellChannelId) {
+    if (msgMan.remoteShellChannelId) {
       // close remote shell channel
       try {
-        const chn = this._channelManager.get(channel.remoteShellChannelId);
+        const chn = this._channelManager.get(msgMan.remoteShellChannelId);
         chn?.write("exit\r\n");
         chn?.write("exit\r\n");
       } catch (e) {
@@ -864,10 +863,10 @@ export class Messenger {
       }
     }
 
-    this._tokenMap.delete(channel.channel.cid);
-    this._channelManager.releaseConnection(channel.channel);
-    channel.queue.destroy();
-    channel.channel.destroy();
+    this.release(msgMan.channel.cid);
+    this._channelManager.releaseConnection(msgMan.channel);
+    msgMan.queue.destroy();
+    msgMan.channel.destroy();
   }
 }
 

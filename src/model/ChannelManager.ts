@@ -11,13 +11,26 @@ import getNextRandomToken from "../utils/random";
 
 export interface Controller {
   openChannel(id?: number): Channel;
-  closeChannel(chn: Channel): void;
+  closeChannel(chn: Channel, code: number): void;
 }
 
 export class ChannelManager {
   private _cid: number = 1;
 
   private readonly _hosts: PhysicalPort[] = [];
+
+  constructor(primaryHost: PhysicalPort, name: string) {
+    this._chnManName = name;
+
+    const controller = {
+      openChannel: this.createChannel.bind(this),
+      closeChannel: this.kill.bind(this),
+    }; // expose the channel manager's management methods to the controller
+
+    this._ctlChannel = new ControllerChannel(primaryHost, controller);
+
+    this.bindHosts([primaryHost]);
+  }
 
   private get primaryHost() {
     return this._hosts[0];
@@ -37,7 +50,25 @@ export class ChannelManager {
   }
 
   private getNextCid() {
-    return this._cid++;
+    const t = Number(Date.now()); // int64 0x0000_0000_0000_0000 - 0xFFFF_FFFF_FFFF_FFFF
+    const u = this._cid++; // int32 0x0000_0000 - 0xFFFF_FFFF
+    const r = Math.ceil(Math.random() * 0xffff); // int16 0x0000 - 0xFFFF
+
+    // console.log(t, u, r);
+    const cid = t ^ (u << 32) ^ (r << 48);
+    // console.log(cid);
+    // t: 0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000
+    //    64                                      32                  16             4
+
+    // u: 0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000
+    //    ^^^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^
+    //    64
+
+    // r: 0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000
+    //    ^^^^ ^^^^ ^^^^ ^^^^
+    //    64
+
+    return Math.abs(cid);
   }
 
   private readonly _ctlChannel: ControllerChannel;
@@ -75,20 +106,6 @@ export class ChannelManager {
   public toString() {
     return this.name;
   }
-
-  constructor(primaryHost: PhysicalPort, name: string) {
-    this._chnManName = name;
-
-    const controller = {
-      openChannel: this.createChannel.bind(this),
-      closeChannel: this.deleteChannel.bind(this),
-    }; // expose the channel manager's management methods to the controller
-
-    this._ctlChannel = new ControllerChannel(primaryHost, controller);
-
-    this.bindHosts([primaryHost]);
-  }
-
   public bindHosts(hosts: PhysicalPort[]) {
     this._hosts.push(...hosts);
     for (const host of hosts) {
@@ -125,12 +142,15 @@ export class ChannelManager {
 
   public async releaseConnection(chn: Channel, timeout: number = 5000) {
     const tk = getNextRandomToken();
+    const cid = chn.cid;
     const msg: ControlMessage = {
       cmd: CtlMessageCommand.DISPOSE,
       flag: CtlMessageFlag.CONTROL,
       tk,
-      data: chn.cid,
+      data: cid,
     };
+
+    this.kill(chn, 0xfff1);
 
     return new Promise<void>((res, rej) => {
       const timeoutHandle = setTimeout(() => {
@@ -139,16 +159,25 @@ export class ChannelManager {
 
       this._ctlChannel.sendCtlMessage(msg, () => {
         clearTimeout(timeoutHandle);
-        this.deleteChannel(chn);
-        chn.destroy();
         res();
       });
     });
   }
 
-  public kill(chn: Channel) {
-    this.deleteChannel(chn);
+  public kill(chn: Channel | number, code: number) {
+    if (typeof chn === "number") {
+      chn = this.get(chn);
+
+      if (!chn) return;
+    }
+
+    this._channels.delete(chn.cid);
     chn.destroy();
+
+    console.log(
+      `[ChnMan] Channel <${chn.cid}> destroyed`,
+      `0x${code.toString(16)}`
+    );
   }
 
   public get(id: number): Channel | undefined {
@@ -181,10 +210,6 @@ export class ChannelManager {
     const channel = new Channel(cid, this.bestHost);
     this._channels.set(cid, channel);
     return channel;
-  }
-
-  private deleteChannel(chn: Channel) {
-    this._channels.delete(chn.cid);
   }
 
   public async destroy() {

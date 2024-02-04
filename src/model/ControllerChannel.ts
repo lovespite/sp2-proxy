@@ -80,6 +80,8 @@ export class ControllerChannel extends Channel {
         if (cb) {
           if (!m.keepAlive) this._cbQueue.delete(m.tk);
           cb(m);
+
+          console.log("Callback:", m);
         }
       } else {
         // 控制消息
@@ -100,7 +102,7 @@ export class ControllerChannel extends Channel {
         break;
       }
       case CtlMessageCommand.DISPOSE: {
-        this._ctl.closeChannel(msg.data);
+        this._ctl.closeChannel(msg.data, (msg as any).code || 0xfa21);
         msg.flag = CtlMessageFlag.CALLBACK;
 
         this.sendCtlMessage(msg);
