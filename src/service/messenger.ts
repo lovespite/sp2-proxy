@@ -15,11 +15,11 @@ import {
   CtlMessageFlag,
   CtlMessageSendBackDelegate,
 } from "../model/ControllerChannel";
-import { ChildProcessWithoutNullStreams, exec, spawn } from "child_process";
+import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 import path from "path";
 import * as fsys from "../utils/fsys";
 
-const version = "1.0.1";
+const version = "1.0.2";
 const root = __dirname;
 const static_root = path.resolve(root, "app", "static");
 const static_root2 = path.resolve(os.homedir(), "sp2mux-files");
@@ -81,9 +81,10 @@ export class Messenger {
     this._host = new PhysicalPort(sp);
     this._channelManager = new ChannelManager(this._host, "messenger");
 
-    this._channelManager.controller.onCtlMessageReceived(
-      this.handleControlMessage.bind(this)
-    );
+    this._channelManager.controller.onCtlMessageReceived((msg, callback) => {
+      // console.log("control message received", msg);
+      this.handleControlMessage(msg, callback).catch(console.log);
+    });
 
     this._systemChannels = new Set();
   }
@@ -209,13 +210,18 @@ export class Messenger {
 
         const fileName = `${getNextRandomToken()}${ext}`;
 
+        const fullName = path.resolve(static_root2, fileName);
         const uri = `/files/${fileName}`;
 
-        const fullName = path.resolve(static_root2, fileName);
+        const dir_ok = await fsys.mkdir(static_root2);
 
-        await fsys
-          .d_exists(static_root2)
-          .then((exists) => exists || fsys.mkdir(static_root2));
+        if (!dir_ok) {
+          console.error("failed to create directory", static_root2);
+          msg.data = null;
+          msg.flag = CtlMessageFlag.CALLBACK;
+          sb(msg);
+          return;
+        }
 
         const fChannel = await this.requireSystemChannel();
 
@@ -768,6 +774,7 @@ export class Messenger {
 
       response.success(res, "ok");
     } catch (e) {
+      console.log(e);
       response.internalError(res, e.message);
     }
   }
@@ -797,6 +804,7 @@ export class Messenger {
 
       response.success(res, "ok");
     } catch (e) {
+      console.log(e);
       response.internalError(res, e.message);
     }
   }
@@ -876,11 +884,4 @@ export class Messenger {
     msgMan.queue.destroy();
     msgMan.channel.destroy();
   }
-}
-
-function infoHtml(version: string, path: string, baudRate: number) {
-  return `
-<p>Version: ${version}</p>
-<p>Connected to ${path}</p>
-<p>Baud rate: ${baudRate}</p>`;
 }

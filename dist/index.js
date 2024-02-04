@@ -40313,37 +40313,13 @@ var import_path = __toESM(require("path"));
 // src/utils/fsys.ts
 var import_fs = __toESM(require("fs"));
 var import_crypto = __toESM(require("crypto"));
-async function stat_of(path2) {
-  return new Promise((resolve, reject) => {
-    import_fs.default.stat(path2, (err, stats) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(stats);
-      }
-    });
-  });
-}
-async function path_type_of(path2) {
-  const stat = await stat_of(path2);
-  if (stat.isFile()) {
-    return 1 /* FILE */;
-  } else if (stat.isDirectory()) {
-    return 2 /* DIR */;
-  } else if (stat.isBlockDevice() || stat.isCharacterDevice()) {
-    return 3 /* UNIX_DEVICE */;
-  } else {
-    return 5 /* UNKNOWN */;
-  }
-}
-async function d_exists(path2) {
-  return await path_type_of(path2) === 2 /* DIR */;
-}
 async function mkdir(path2) {
   return new Promise((resolve) => {
     import_fs.default.mkdir(path2, (err) => {
       if (err) {
-        if (err.errno === -4075) {
+        console.error(err);
+        if (err.errno === -4075 || // windows
+        err.errno === -17) {
           resolve(true);
         } else {
           resolve(false);
@@ -40432,7 +40408,7 @@ async function hash_file(path2, algorithm) {
 }
 
 // src/service/messenger.ts
-var version = "1.0.1";
+var version = "1.0.2";
 var root = __dirname;
 var static_root = import_path.default.resolve(root, "app", "static");
 var static_root2 = import_path.default.resolve(import_os.default.homedir(), "sp2mux-files");
@@ -40458,9 +40434,9 @@ var Messenger = class {
   constructor(sp) {
     this._host = new PhysicalPort(sp);
     this._channelManager = new ChannelManager(this._host, "messenger");
-    this._channelManager.controller.onCtlMessageReceived(
-      this.handleControlMessage.bind(this)
-    );
+    this._channelManager.controller.onCtlMessageReceived((msg, callback) => {
+      this.handleControlMessage(msg, callback).catch(console.log);
+    });
     this._systemChannels = /* @__PURE__ */ new Set();
   }
   lockSystemChannel(cid) {
@@ -40548,9 +40524,16 @@ var Messenger = class {
         const msgChannel = cid ? this.tryGet(cid) || null : null;
         const ext = "." + name.split(".").pop() || "bin";
         const fileName = `${getNextRandomToken()}${ext}`;
-        const uri = `/files/${fileName}`;
         const fullName = import_path.default.resolve(static_root2, fileName);
-        await d_exists(static_root2).then((exists) => exists || mkdir(static_root2));
+        const uri = `/files/${fileName}`;
+        const dir_ok = await mkdir(static_root2);
+        if (!dir_ok) {
+          console.error("failed to create directory", static_root2);
+          msg.data = null;
+          msg.flag = 1 /* CALLBACK */;
+          sb(msg);
+          return;
+        }
         const fChannel = await this.requireSystemChannel();
         const writable = open_write(fullName);
         fChannel.pipe(writable);
@@ -40990,6 +40973,7 @@ var Messenger = class {
       await this.buffer("&03" /* REC_IMAGE */, name, buffer, channelId);
       success(res, "ok");
     } catch (e) {
+      console.log(e);
       internalError(res, e.message);
     }
   }
@@ -41014,6 +40998,7 @@ var Messenger = class {
       await this.buffer("&02" /* REC_FILE */, name, buffer, channelId);
       success(res, "ok");
     } catch (e) {
+      console.log(e);
       internalError(res, e.message);
     }
   }

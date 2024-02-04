@@ -59,7 +59,11 @@ export async function mkdir(path: string): Promise<boolean> {
   return new Promise((resolve) => {
     fs.mkdir(path, (err) => {
       if (err) {
-        if (err.errno === -4075) {
+        console.error(err);
+        if (
+          err.errno === -4075 || // windows
+          err.errno === -17 // darwin
+        ) {
           resolve(true);
         } else {
           resolve(false);
