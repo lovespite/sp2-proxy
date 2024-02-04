@@ -12,6 +12,10 @@ export class ChannelManager {
   private _cid: number = 1;
 
   private readonly _hosts: PhysicalPort[] = [];
+  private readonly _ctlChannel: ControllerChannel;
+
+  private _packCount: number = 0;
+  private _droppedCount: number = 0;
 
   constructor(primaryHost: PhysicalPort, name: string) {
     this._chnManName = name;
@@ -48,9 +52,8 @@ export class ChannelManager {
     const u = this._cid++; // int32 0x0000_0000 - 0xFFFF_FFFF
     const r = Math.ceil(Math.random() * 0xffff); // int16 0x0000 - 0xFFFF
 
-    // console.log(t, u, r);
     const cid = t ^ (u << 32) ^ (r << 48);
-    // console.log(cid);
+
     // t: 0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000
     //    64                                      32                  16             4
 
@@ -65,11 +68,6 @@ export class ChannelManager {
     return Math.abs(cid);
   }
 
-  private readonly _ctlChannel: ControllerChannel;
-
-  private _packCount: number = 0;
-  private _droppedCount: number = 0;
-
   private count() {
     ++this._packCount;
   }
@@ -77,7 +75,7 @@ export class ChannelManager {
     ++this._droppedCount;
   }
 
-  public get packCount() {
+  public get frameCount() {
     return this._packCount;
   }
 

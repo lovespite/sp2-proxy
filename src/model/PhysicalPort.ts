@@ -24,6 +24,18 @@ export class PhysicalPort {
   private _isRunning: boolean = false;
   private _isFinished: boolean = false;
 
+  private _trafficIn: bigint = BigInt(0);
+  private _trafficOut: bigint = BigInt(0);
+
+  public get traffic() {
+    const t_in = this._trafficIn;
+    const t_out = this._trafficOut;
+    return {
+      t_in: `${t_in} (${(t_in / 1024n).toString()} KB)`,
+      t_out: `${t_out} (${(t_out / 1024n).toString()} KB)`,
+    };
+  }
+
   private readonly _frameBeg: Buffer = Buffer.from([FrameBeg]);
   private readonly _frameEnd: Buffer = Buffer.from([FrameEnd]);
 
@@ -145,6 +157,7 @@ export class PhysicalPort {
 
         if (!this._physical) break;
 
+        this._trafficOut += BigInt(pack.data.length);
         this._physical.write(
           Buffer.concat([this._frameBeg, pack.data, this._frameEnd])
         );
@@ -172,6 +185,9 @@ export class PhysicalPort {
     try {
       while (this._isRunning) {
         const pack = await this.blockDequeueIn();
+
+        if (!pack) continue;
+        this._trafficIn += BigInt(pack.data.length);
 
         this.emitPackReceived(pack);
       }

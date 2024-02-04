@@ -14,6 +14,8 @@ const ctls = {
   btnShell: null,
 
   txtContent: null,
+
+  sysinfo: null,
 };
 
 function loadCtls() {
@@ -30,6 +32,7 @@ function loadCtls() {
   ctls.btnShell = document.querySelector("#shell");
 
   ctls.txtContent = document.querySelector("#content");
+  ctls.sysinfo = document.querySelector("#system-info");
 }
 
 (function () {
@@ -200,6 +203,8 @@ async function sendShell() {
     const command = ctls.txtContent.value;
     if (!command) return;
 
+    await Api.sendShell(cid, token, command, window.shellChannel);
+
     if (command === "exit") {
       const quitShellMode = confirm("你输入了退出命令，是否退出远程终端模式？");
       if (quitShellMode) {
@@ -208,8 +213,6 @@ async function sendShell() {
         ctls.txtContent.style.color = "black";
       }
     }
-
-    await Api.sendShell(cid, token, command, window.shellChannel);
 
     ctls.txtContent.value = "";
   }
@@ -295,6 +298,15 @@ function info(msg) {
   el.textContent = msg;
 }
 
+function sysinfo(info) {
+  ctls.sysinfo.textContent = `
+  Ver.: ${info.version};
+  Path/BaudRate: ${info.path} / ${info.baudRate};
+  Frames/Dropped: ${info.frames} / ${info.droppedFrames}; 
+  Traffic Out/In: ${info.traffic.t_out} / ${info.traffic.t_in} 
+  `;
+}
+
 function startMessageLoop(ret, msgContainer) {
   const controller = new AbortController();
   window.current = {
@@ -304,8 +316,12 @@ function startMessageLoop(ret, msgContainer) {
       controller,
       cid: ret.cid,
       token: ret.token,
-      callback: (message) => {
-        pushMessageEl(message, msgContainer, "remote-message");
+      callback: (type, message) => {
+        if (type === 0) {
+          pushMessageEl(message, msgContainer, "remote-message");
+        } else if (type === 1) {
+          sysinfo(message);
+        }
       },
     }).then(() => {
       // communication terminated

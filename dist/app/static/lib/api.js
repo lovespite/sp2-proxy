@@ -13,6 +13,15 @@
       }
     },
 
+    getSysInfo: async function () {
+      try {
+        const ret = await http.get("/api/sysinfo");
+        return throwIfNotFulfilled(ret);
+      } catch (e) {
+        // ignore
+      }
+    },
+
     /**
      * @param {number?} cid
      * @returns {Promise<{token: string, cid: number}>}
@@ -184,8 +193,10 @@
       });
 
       socket.on("data", (msg) => {
-        callback(msg);
+        callback(0, msg);
       });
+
+      socket.on("sysinfo", (info) => callback(1, info));
 
       await new Promise((resolve) => {
         controller.signal.addEventListener("abort", () => {

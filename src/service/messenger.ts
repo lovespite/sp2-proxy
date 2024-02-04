@@ -2,7 +2,7 @@ import { ReadlineParser, SerialPort } from "serialport";
 import { PhysicalPort } from "../model/PhysicalPort";
 import express, { Response, Request } from "express";
 import * as ws from "socket.io";
-import { createServer } from "http";
+import { ServerOptions, createServer } from "https";
 import { ChannelManager } from "../model/ChannelManager";
 import { BlockQueue, QueueTimeoutError } from "../model/BlockQueue";
 import * as response from "../utils/success";
@@ -51,9 +51,6 @@ enum ExMessageCmd {
   SHELL = "&01",
   REC_FILE = "&02",
   REC_IMAGE = "&03",
-  READ_DIR = "&04", // TODO: not implemented yet
-  GET_FILE = "&05", // TODO: not implemented yet
-  PUT_FILE = "&06", // TODO: not implemented yet
 }
 
 export class Messenger {
@@ -112,22 +109,15 @@ export class Messenger {
   }
 
   private async getRemoteChannels() {
-    const msg: ControlMessage = {
-      tk: null,
+    const msg = {
       cmd: ExMessageCmd.GET_CHANNELS,
-      flag: CtlMessageFlag.CONTROL,
     };
 
-    return new Promise<number[]>((resolve, reject) => {
-      const timeOut = setTimeout(() => {
-        reject(new Error("timeout"));
-      }, 10_000); // 10s
+    const ret = await this._channelManager.controller.callRemoteProc(msg);
 
-      this._channelManager.controller.sendCtlMessage(msg, (m) => {
-        clearTimeout(timeOut);
-        resolve(m.data);
-      });
-    });
+    if (!ret.data) return [];
+
+    return ret.data as number[];
   }
 
   private async handleControlMessage(
@@ -217,7 +207,7 @@ export class Messenger {
 
         const ext = "." + name.split(".").pop() || "bin";
 
-        const fileName = `${randomToken()}${ext}`;
+        const fileName = `${getNextRandomToken()}${ext}`;
 
         const uri = `/files/${fileName}`;
 
@@ -227,9 +217,7 @@ export class Messenger {
           .d_exists(static_root2)
           .then((exists) => exists || fsys.mkdir(static_root2));
 
-        console.log("ready to receive", sha1, fullName);
         const fChannel = await this.requireSystemChannel();
-        console.log("file channel established", fChannel.cid);
 
         const writable = fsys.open_write(fullName);
         fChannel.pipe(writable);
@@ -267,25 +255,77 @@ export class Messenger {
         break;
       }
 
-      case ExMessageCmd.READ_DIR: {
-        const path = msg.data as string;
-
-        const objs = path
-          ? await fsys.enum_path(path)
-          : await fsys.query_roots();
-
-        msg.flag = CtlMessageFlag.CALLBACK;
-        msg.data = objs;
-
-        sb(msg);
+      default: {
         break;
       }
     }
   }
 
-  public start({ port, listen }: { port: number; listen: string }) {
+  private async buffer(
+    cmd: ExMessageCmd,
+    name: string,
+    buffer: Buffer,
+    channelId?: number
+  ) {
+    const tmpFile = path.resolve(os.tmpdir(), getNextRandomToken());
+
+    const tmp = fsys.open_write(tmpFile);
+    tmp.write(buffer);
+
+    await new Promise<void>((resolve, reject) => {
+      tmp.close((err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    const sha1 = await fsys.hash(tmpFile);
+
+    const ret = await this._channelManager.controller.callRemoteProc({
+      cmd,
+      data: {
+        name: decodeURIComponent(name),
+        cid: channelId,
+        sha1,
+      },
+    });
+
+    if (!ret.data) throw new Error("failed to open channel");
+
+    console.log("file channel established", ret.data);
+
+    const cid = ret.data as number;
+    const fChannel = this._channelManager.get(cid);
+
+    if (!fChannel) throw new Error("failed to open channel");
+
+    const readable = fsys.open_read(tmpFile);
+    readable.pipe(fChannel);
+
+    return new Promise<void>((resolve) => {
+      readable.once("end", () => {
+        fsys.try_rm(tmpFile);
+        resolve();
+      });
+    });
+  }
+
+  public async start({ port, listen }: { port: number; listen: string }) {
     const app = express();
-    const server = createServer(app);
+    const options: ServerOptions = {
+      key: await fsys.read_file(
+        path.resolve(__dirname, "server.key"),
+        fsys.DataType.BUFFER
+      ),
+      cert: await fsys.read_file(
+        path.resolve(__dirname, "server.cert"),
+        fsys.DataType.BUFFER
+      ),
+    };
+    const server = createServer(options, app);
     const wsio = new ws.Server(server);
 
     wsio.on("connection", this.onConnection.bind(this));
@@ -296,7 +336,8 @@ export class Messenger {
       express.raw({ type: "application/octet-stream", limit: "50mb" })
     );
 
-    app.get("/info", this.getInfo.bind(this));
+    app.get("/api/sysinfo", this.getSysInfo.bind(this));
+
     app.get("/api/channels", this.getChannels.bind(this));
     app.post("/api/channel", this.openChannel.bind(this));
     app.delete("/api/channel/:cid", this.closeChannel.bind(this));
@@ -311,7 +352,7 @@ export class Messenger {
     app.use("/files", express.static(static_root2));
 
     server.listen(port, listen, () => {
-      console.log(`Working on http://${listen}:${port}`);
+      console.log(`Working on https://${listen}:${port}`);
     });
 
     this._host.start();
@@ -333,6 +374,21 @@ export class Messenger {
 
     console.log(socket.id, "connecting", cid, token);
     const ret = await this.connectSocketToChannel(socket, parseInt(cid), token);
+
+    const h = setInterval(() => {
+      socket.emit("sysinfo", {
+        version,
+        path: this._host.path,
+        baudRate: this._host.baudRate,
+        frames: this._channelManager.frameCount,
+        droppedFrames: this._channelManager.droppedCount,
+        traffic: this._host.traffic,
+      });
+    }, 1000);
+
+    socket.once("disconnect", () => {
+      clearInterval(h);
+    });
 
     if (!ret.success) {
       console.log(socket.id, "connected", ret);
@@ -376,24 +432,25 @@ export class Messenger {
       return false;
     };
 
-    // socket.once("disconnect", () => {
-    //   try {
-    //     this.close(msgMan);
-    //     console.log(`channel ${cid} closed: client disconnect.`);
-    //   } catch (e) {
-    //     console.error(e);
-    //   }
-    // });
-
     return { success: true, message: "ok" };
   }
 
   // ============== http handlers ==============
 
-  private async getInfo(req: Request, res: Response) {
-    res
-      .type("html")
-      .send(infoHtml(version, this._host.path, this._host.baudRate));
+  /**
+   * get /api/sysinfo
+   * @param req
+   * @param res
+   */
+  private async getSysInfo(req: Request, res: Response) {
+    response.success(res, {
+      version,
+      path: this._host.path,
+      baudRate: this._host.baudRate,
+      frames: this._channelManager.frameCount,
+      droppedFrames: this._channelManager.droppedCount,
+      traffic: this._host.traffic,
+    });
   }
 
   /**
@@ -594,11 +651,19 @@ export class Messenger {
     if (sid) {
       const shellChannelId = parseInt(sid);
       const chn = this._channelManager.get(shellChannelId);
-      chn.write(command + "\r\n");
 
-      return response.success(res, {
-        shellChannel: shellChannelId,
-      });
+      if (chn) {
+        chn.write(command + "\r\n");
+
+        response.success(res, {
+          shellChannel: shellChannelId,
+        });
+
+        return;
+      } else {
+        response.fail(res, "shell channel released");
+        return;
+      }
     }
 
     const channelId = parseInt(cid);
@@ -619,43 +684,22 @@ export class Messenger {
     }
 
     try {
-      const ret = await new Promise<{
-        success: boolean;
-        message: string;
-        cid: number;
-      }>((res) => {
-        const ctl = this._channelManager.controller;
-
-        ctl.sendCtlMessage(
-          {
-            tk: getNextRandomToken(),
-            flag: CtlMessageFlag.CONTROL,
-            cmd: ExMessageCmd.SHELL,
-            data: {
-              command,
-              cid: channelId,
-            },
+      const msgback = (
+        await this._channelManager.controller.callRemoteProc({
+          cmd: ExMessageCmd.SHELL,
+          data: {
+            command,
+            cid: channelId,
           },
-          (m) => {
-            console.log("shell response", m);
-            if (m.data) {
-              res(m.data);
-            } else {
-              res({
-                success: false,
-                message: m.data?.message || "unknown error",
-                cid: 0,
-              });
-            }
-          }
-        );
-      });
+        })
+      ).data as unknown as { success: boolean; message: string; cid: number };
 
-      if (!ret.success) return response.fail(res, ret.message);
-      if (!ret.cid) return response.fail(res, "invalid shell channel");
+      if (!msgback) return response.fail(res, "failed to open shell channel");
+      if (!msgback.success) return response.fail(res, msgback.message);
+      if (!msgback.cid) return response.fail(res, "invalid shell channel");
 
-      const sChannel = this._channelManager.get(ret.cid);
-      msgChannel.remoteShellChannelId = ret.cid;
+      const sChannel = this._channelManager.get(msgback.cid);
+      msgChannel.remoteShellChannelId = msgback.cid;
 
       sChannel
         .pipe(
@@ -672,9 +716,10 @@ export class Messenger {
         });
 
       response.success(res, {
-        shellChannel: ret.cid,
+        shellChannel: msgback.cid,
       });
     } catch (e) {
+      console.log(e);
       response.internalError(res, e.message);
     }
   }
@@ -754,43 +799,6 @@ export class Messenger {
     } catch (e) {
       response.internalError(res, e.message);
     }
-  }
-
-  private async buffer(
-    cmd: ExMessageCmd,
-    name: string,
-    buffer: Buffer,
-    channelId?: number
-  ) {
-    const sha1 = await fsys.hash(buffer);
-    return new Promise<void>((resolve, reject) => {
-      this._channelManager.controller.sendCtlMessage(
-        {
-          tk: getNextRandomToken(),
-          flag: CtlMessageFlag.CONTROL,
-          cmd,
-          data: {
-            name: decodeURIComponent(name),
-            cid: channelId,
-            sha1,
-          },
-        },
-        (m) => {
-          if (!m.data) return reject(new Error("failed to open channel"));
-
-          console.log("file channel established", m.data);
-
-          const cid = m.data as number;
-          const fChannel = this._channelManager.get(cid);
-
-          fChannel.write(buffer, () => {
-            // console.log("file sent");
-            fChannel.finish();
-            resolve();
-          });
-        }
-      );
-    });
   }
 
   /**
@@ -875,12 +883,4 @@ function infoHtml(version: string, path: string, baudRate: number) {
 <p>Version: ${version}</p>
 <p>Connected to ${path}</p>
 <p>Baud rate: ${baudRate}</p>`;
-}
-
-function randomToken() {
-  return (
-    Math.random().toString(36).substring(2) +
-    Date.now().toString(36) +
-    getNextRandomToken()
-  );
 }
