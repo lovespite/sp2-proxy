@@ -56,3 +56,11 @@ export function notFound(res: Response) {
     message: "not found",
   });
 }
+
+export function methodNotAllowed(res: Response) {
+  res.status(405).json({
+    success: false,
+    code: 0,
+    message: "method not allowed",
+  });
+}

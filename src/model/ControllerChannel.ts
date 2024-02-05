@@ -70,6 +70,15 @@ export class ControllerChannel extends Channel {
     if (cb) this._cbQueue.set(msg.tk, cb);
   }
 
+  /**
+   * Send a control message to the remote side, and wait for the response
+   * This is typically used for RPC
+   * @param msg
+   * @param timeout If timeout is set to <= 0, then it will never timeout
+   * @param noReturn If set to true, then it will not wait for the response,
+   * and the return value is always null
+   * @returns
+   */
   public callRemoteProc(
     msg: Partial<ControlMessage>,
     timeout: number = 5000,
@@ -86,12 +95,15 @@ export class ControllerChannel extends Channel {
         return;
       }
 
-      const th = setTimeout(() => {
-        reject(new RpcTimeoutError());
-      }, timeout);
+      const th =
+        timeout > 0
+          ? setTimeout(() => {
+              reject(new RpcTimeoutError());
+            }, timeout)
+          : null;
 
       function listener(msg: ControlMessage) {
-        clearTimeout(th);
+        th && clearTimeout(th);
         resolve(msg);
       }
     });

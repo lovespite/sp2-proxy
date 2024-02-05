@@ -30,21 +30,29 @@ export async function stat_of(path: fs.PathLike): Promise<fs.Stats> {
 }
 
 export async function path_type_of(path: string) {
-  const stat = await stat_of(path);
-  if (stat.isFile()) {
-    return PathType.FILE;
-  } else if (stat.isDirectory()) {
-    return PathType.DIR;
-  } else if (stat.isBlockDevice() || stat.isCharacterDevice()) {
-    return PathType.UNIX_DEVICE;
-  } else {
-    return PathType.UNKNOWN;
+  try {
+    const stat = await stat_of(path);
+    if (stat.isFile()) {
+      return PathType.FILE;
+    } else if (stat.isDirectory()) {
+      return PathType.DIR;
+    } else if (stat.isBlockDevice() || stat.isCharacterDevice()) {
+      return PathType.UNIX_DEVICE;
+    } else {
+      return PathType.UNKNOWN;
+    }
+  } catch (e) {
+    return PathType.NOT_FOUND;
   }
 }
 
 export async function path_size_of(path: string) {
-  const { size } = await stat_of(path);
-  return size;
+  try {
+    const { size } = await stat_of(path);
+    return size;
+  } catch (e) {
+    return -1;
+  }
 }
 
 export async function f_exists(path: string) {
@@ -59,7 +67,7 @@ export async function mkdir(path: string): Promise<boolean> {
   return new Promise((resolve) => {
     fs.mkdir(path, (err) => {
       if (err) {
-        console.error(err);
+        console.log("failed to mkdir: ", err);
         if (
           err.errno === -4075 || // windows
           err.errno === -17 // darwin
