@@ -90,14 +90,13 @@ export class PhysicalPort {
     const cid = 0;
     const buffer = Buffer.from(msg, "utf8");
 
-    const { buffer: data, meta } = buildFrameBuffer(buffer, cid);
+    const data = buildFrameBuffer(buffer, cid);
 
     this._queueOutgoing.unshift({
       channelId: cid,
       id: 0,
       data,
       length: buffer.length,
-      ...meta,
     });
   }
 

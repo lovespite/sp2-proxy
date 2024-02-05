@@ -39083,23 +39083,16 @@ var require_dist2 = __commonJS({
 var import_stream = require("stream");
 
 // src/utils/frame.ts
-var MetaSize = 32;
-var MaxTransmitionUnitSize = 1e3;
+var MetaSize = 16;
+var MaxTransmitionUnitSize = 1500;
 var EscapeChar = 16;
-var FrameFed = 1;
 var FrameBeg = 2;
 var FrameEnd = 3;
 var EscapeChar_Escaped = EscapeChar ^ 255;
-var FrameFed_Escaped = FrameFed ^ 255;
 var FrameBeg_Escaped = FrameBeg ^ 255;
 var FrameEnd_Escaped = FrameEnd ^ 255;
-var SpecialChars = [EscapeChar, FrameBeg, FrameEnd, FrameFed];
-var SpecialChars_Escaped = [
-  EscapeChar_Escaped,
-  FrameBeg_Escaped,
-  FrameEnd_Escaped,
-  FrameFed_Escaped
-];
+var SpecialChars = [EscapeChar, FrameBeg, FrameEnd];
+var SpecialChars_Escaped = [EscapeChar_Escaped, FrameBeg_Escaped, FrameEnd_Escaped];
 var SpecialCharRatioThreshold = 0.077;
 function escapeBuffer(buffer) {
   const scp = scanBuffer(buffer);
@@ -39128,7 +39121,7 @@ function constructTestBuffer(size, specialCharRatio) {
   }
   return [buffer, specialCharCount / size];
 }
-function _crc32(buffer) {
+function crc32(buffer) {
   let crc = 4294967295;
   for (let i = 0; i < buffer.length; i++) {
     crc = crc ^ buffer[i];
@@ -39139,7 +39132,7 @@ function _crc32(buffer) {
   return crc ^ 4294967295;
 }
 function testEscapeBuffer(buffer) {
-  const crc32origin = _crc32(buffer);
+  const crc32origin = crc32(buffer);
   const t1 = Date.now();
   const scp = scanBuffer(buffer);
   const t2 = Date.now();
@@ -39149,34 +39142,18 @@ function testEscapeBuffer(buffer) {
   const t4 = Date.now();
   const bcUsage = t4 - t3;
   const unescape1 = unescapeBuffer(bf1);
-  const crc32_1 = _crc32(unescape1);
+  const crc32_1 = crc32(unescape1);
   const bcCrc32Pass = crc32_1 === crc32origin ? "PASS" : "FAIL";
   const t5 = Date.now();
   const bf2 = escapeBufferInternal_ByteByByte(buffer, scp);
   const t6 = Date.now();
   const bbUsage = t6 - t5;
   const unescape2 = unescapeBuffer(bf2);
-  const crc32_2 = _crc32(unescape2);
+  const crc32_2 = crc32(unescape2);
   const bbCrc32Pass = crc32_2 === crc32origin ? "PASS" : "FAIL";
   console.log(" - [Scan]", scanUsage, "ms (", buffer.length, ") bytes");
-  console.log(
-    " - [Bc-Result]",
-    bcCrc32Pass,
-    "Usage",
-    bcUsage,
-    "ms (",
-    bf1.length,
-    ") bytes"
-  );
-  console.log(
-    " - [Bb-Result]",
-    bbCrc32Pass,
-    "Usage",
-    bbUsage,
-    "ms (",
-    bf2.length,
-    ") bytes"
-  );
+  console.log(" - [Bc-Result]", bcCrc32Pass, "Usage", bcUsage, "ms (", bf1.length, ") bytes");
+  console.log(" - [Bb-Result]", bbCrc32Pass, "Usage", bbUsage, "ms (", bf2.length, ") bytes");
 }
 function scanBuffer(buffer) {
   const specialCharPositions = [];
@@ -39247,60 +39224,41 @@ function buildNullFrameObj(cid, keepAlive) {
   return {
     channelId: cid,
     id: 0,
-    data: buildFrameBuffer(Buffer.allocUnsafe(0), cid).buffer,
+    data: buildFrameBuffer(Buffer.allocUnsafe(0), cid),
     length: 0,
-    keepAlive,
-    crc32: 0,
-    fid: 0n
+    keepAlive
   };
 }
-var frameCounter = 0n;
 function buildFrameBuffer(chunk, cid) {
   const buffer = Buffer.allocUnsafe(chunk.length + MetaSize);
-  const crc32 = chunk.length === 0 ? 0 : _crc32(chunk);
-  const fid = chunk.length === 0 ? 0n : frameCounter++;
   buffer.writeBigInt64LE(BigInt(cid), 0);
   buffer.writeBigInt64LE(BigInt(chunk.length), 8);
-  buffer.writeBigInt64LE(fid, 16);
-  buffer.writeBigInt64LE(BigInt(crc32), 24);
   buffer.set(chunk, MetaSize);
-  return {
-    buffer: escapeBuffer(buffer),
-    meta: {
-      crc32,
-      fid
-    }
-  };
+  return escapeBuffer(buffer);
 }
 function parseFrameBuffer(frame) {
   const buffer = unescapeBuffer(frame);
   const cid = Number(buffer.readBigInt64LE(0));
   const length = Number(buffer.readBigInt64LE(8));
-  const fid = buffer.readBigInt64LE(16);
-  const crc32 = Number(buffer.readBigInt64LE(24));
-  const data = buffer.subarray(MetaSize, MetaSize + length);
+  const data = buffer.subarray(16, 16 + length);
   return {
     channelId: cid,
     length,
     id: 0,
-    data,
-    crc32,
-    fid
+    data
   };
 }
-function slice(buffer, cid) {
+function slice(data, cid) {
   const packs = [];
   let index = 0;
   let offset = 0;
-  const { buffer: data, meta } = buildFrameBuffer(buffer, cid);
-  while (offset < buffer.length) {
-    const dataSlice = buffer.subarray(offset, offset + MaxTransmitionUnitSize);
+  while (offset < data.length) {
+    const dataSlice = data.subarray(offset, offset + MaxTransmitionUnitSize);
     const pack = {
       channelId: cid,
       id: index,
-      data,
-      length: dataSlice.length,
-      ...meta
+      data: buildFrameBuffer(dataSlice, cid),
+      length: dataSlice.length
     };
     packs.push(pack);
     offset += MaxTransmitionUnitSize;
@@ -39750,13 +39708,12 @@ var PhysicalPort = class {
     }
     const cid = 0;
     const buffer = Buffer.from(msg, "utf8");
-    const { buffer: data, meta } = buildFrameBuffer(buffer, cid);
+    const data = buildFrameBuffer(buffer, cid);
     this._queueOutgoing.unshift({
       channelId: cid,
       id: 0,
       data,
-      length: buffer.length,
-      ...meta
+      length: buffer.length
     });
   }
   onFrameReceived(event) {
@@ -40451,7 +40408,7 @@ async function hash_file(path2, algorithm) {
 }
 
 // src/service/messenger.ts
-var version = "2.0.0a";
+var version = "1.0.2";
 var root = __dirname;
 var static_root = import_path.default.resolve(root, "app", "static");
 var static_root2 = import_path.default.resolve(import_os.default.homedir(), "sp2mux-files");
