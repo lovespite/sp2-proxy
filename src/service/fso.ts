@@ -1,3 +1,4 @@
+import { BlockMap, MapTimeoutError } from "../model/BlockMap";
 import { ControllerChannel } from "../model/ControllerChannel";
 import * as fsys from "../utils/fsys";
 import getNextRandomToken from "../utils/random";
@@ -35,11 +36,11 @@ export type FileOperationResult = {
 export class FsoRouter {
   private readonly _router: Router;
   private readonly _contoller: ControllerChannel;
-  private readonly _results: Map<string, FileOperationResult | Buffer>;
+  private readonly _results: BlockMap<FileOperationResult>;
 
   constructor(clt: ControllerChannel) {
     this._contoller = clt;
-    this._results = new Map<string, FileOperationResult>();
+    this._results = new BlockMap(1000);
     this._router = Router();
     this._router.use((req, res, next) => {
       if (req.method !== "POST") {
@@ -61,7 +62,7 @@ export class FsoRouter {
   }
 
   public init() {
-    this._router.post("/:cmd", async (req, res) => {
+    this._router.post("/rpc/:cmd", async (req, res) => {
       const ticket = getNextRandomToken();
       const timeoutStr = req.query.timeout as string;
       const timeout = parseInt(timeoutStr) || 30000;
@@ -97,15 +98,27 @@ export class FsoRouter {
 
     this._router.get("/result/:ticket", async (req, res) => {
       const ticket = req.params.ticket as string;
-      const result = this._results.get(ticket);
-      if (result) {
-        if (result instanceof Buffer) {
-          res.send(result);
+      const timeoutStr = req.query.timeout as string;
+      const timeout = parseInt(timeoutStr) || 30000;
+      try {
+        const result = await this._results.get(ticket, timeout);
+
+        if (result) {
+          response.success(res, {
+            fulfilled: true,
+            result,
+          });
         } else {
-          response.success(res, result);
+          response.fail(res, "no result");
         }
-      } else {
-        response.notFound(res);
+      } catch (e) {
+        if (e instanceof MapTimeoutError) {
+          response.success(res, {
+            fulfilled: false,
+          });
+        } else {
+          response.internalError(res, e.message);
+        }
       }
     });
   }

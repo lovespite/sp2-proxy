@@ -6,8 +6,7 @@ import * as opt from "./utils/options";
 import { listSerialPorts, openSerialPort } from "./utils/serialportHelp";
 import ProxyEndPoint from "./service/proxy";
 import { Messenger } from "./service/messenger";
-
-const version = "1.0.6";
+import { version } from "./vc";
 
 async function main() {
   console.log(`Serial Port Proxy v${version}`);

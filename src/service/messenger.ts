@@ -9,6 +9,7 @@ import * as response from "../utils/success";
 import { Channel } from "../model/Channel";
 import getNextRandomToken from "../utils/random";
 import os from "os";
+import { version } from "../vc";
 
 import {
   ControlMessage,
@@ -18,8 +19,8 @@ import {
 import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 import path from "path";
 import * as fsys from "../utils/fsys";
+import { existsSync } from "fs";
 
-const version = "1.0.2";
 const root = __dirname;
 const static_root = path.resolve(root, "app", "static");
 const static_root2 = path.resolve(os.homedir(), "sp2mux-files");
@@ -321,15 +322,24 @@ export class Messenger {
 
   public async start({ port, listen }: { port: number; listen: string }) {
     const app = express();
+    (await import("dotenv")).config();
+
+    const { TLS_KEY_FILE, TLS_CERT_FILE } = process.env;
+
+    if (
+      !TLS_KEY_FILE ||
+      !TLS_CERT_FILE ||
+      !existsSync(TLS_KEY_FILE) ||
+      !existsSync(TLS_CERT_FILE)
+    ) {
+      console.log("TLS_KEY_FILE or TLS_CERT_FILE not found in environment");
+      throw new Error("TLS_KEY_FILE or TLS_CERT_FILE not found in environment");
+    }
+
     const options: ServerOptions = {
-      key: await fsys.read_file(
-        path.resolve(__dirname, "server.key"),
-        fsys.DataType.BUFFER
-      ),
-      cert: await fsys.read_file(
-        path.resolve(__dirname, "server.cert"),
-        fsys.DataType.BUFFER
-      ),
+      key: await fsys.read_file(TLS_KEY_FILE, fsys.DataType.BUFFER),
+      cert: await fsys.read_file(TLS_CERT_FILE, fsys.DataType.BUFFER),
+      passphrase: process.env.TLS_PASSPHRASE,
     };
     const server = createServer(options, app);
     const wsio = new ws.Server(server);
