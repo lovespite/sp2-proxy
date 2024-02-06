@@ -1,21 +1,11 @@
-import {
-  IncomingMessage,
-  ServerResponse,
-  request as _request,
-  createServer,
-} from "http";
+import { IncomingMessage, request as _request, createServer } from "http";
 import { NetConnectOpts, connect as _connect } from "net";
 import internal from "stream";
 import { SerialPort } from "serialport";
 import { PhysicalPort } from "../model/PhysicalPort";
-import {
-  ChannelManager,
-  EstablishChannelTimeoutError,
-} from "../model/ChannelManager";
-import { Channel } from "../model/Channel";
-import { CtlMessageCommand, CtlMessageFlag } from "../model/ControllerChannel";
+import { ChannelManager } from "../model/ChannelManager";
+import { CtlMessageCommand } from "../model/ControllerChannel";
 import { ControllerChannel } from "../model/ControllerChannel";
-import getNextRandomToken from "../utils/random";
 
 // function request(cReq: IncomingMessage, cRes: ServerResponse) {
 //   const u = new URL(cReq.url);
@@ -66,6 +56,7 @@ export type ProxyOptions = {
   serialPorts: SerialPort[];
   port?: number;
   listen?: string;
+  rule?: string;
 };
 
 export class ProxyServer {

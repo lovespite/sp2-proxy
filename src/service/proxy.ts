@@ -2,13 +2,15 @@ import { ChannelManager } from "../model/ChannelManager";
 import { PhysicalPort } from "../model/PhysicalPort";
 import { ControlMessage, CtlMessageCommand } from "../model/ControllerChannel";
 import { RequestOptions } from "http";
-import { NetConnectOpts } from "net";
+import { TcpNetConnectOpts } from "net";
 import { redirectRequestToChn, redirectConnectToChn } from "./request";
 import { ProxyOptions } from "./host";
+import { Rule } from "./rule";
 
 export default class ProxyEndPoint {
   private readonly _hosts: PhysicalPort[];
   private readonly _channelManager: ChannelManager;
+  private _rule: Rule;
 
   constructor(options: ProxyOptions) {
     this._hosts = options.serialPorts.map((port) => new PhysicalPort(port));
@@ -16,23 +18,34 @@ export default class ProxyEndPoint {
     this._channelManager.bindHosts(this._hosts.slice(1));
   }
 
-  private onCtlMessageReceived(msg: ControlMessage) {
+  private async onCtlMessageReceived(msg: ControlMessage) {
     switch (msg.cmd) {
       case CtlMessageCommand.CONNECT: {
         //remote client want a socket connection
-        const { cid, opt } = msg.data;
+        const { cid, opt } = msg.data as {
+          cid: number;
+          opt: TcpNetConnectOpts;
+        };
         const channel = this._channelManager.get(cid);
+
+        if (this._rule) {
+          const [host, port] = await this._rule.getAsync(opt.host, opt.port);
+
+          opt.host = host;
+          opt.port = port;
+        }
 
         console.log(
           "[ProxyEndPoint/Socket]",
           channel.path,
           cid,
           "Connecting",
-          opt
+          opt.host,
+          opt.port
         );
 
         if (channel) {
-          redirectConnectToChn(opt as NetConnectOpts, channel, () => {
+          redirectConnectToChn(opt, channel, () => {
             console.log("[ProxyEndPoint/Socket]", cid, "Channel is closing.");
             this._channelManager.kill(channel, 0x1);
           });
@@ -73,6 +86,7 @@ export default class ProxyEndPoint {
 
   public async proxy() {
     const ctl = this._channelManager.controller;
+    this._rule = await Rule.loadRule();
 
     ctl.onCtlMessageReceived(this.onCtlMessageReceived.bind(this));
     await Promise.all(this._hosts.map((host) => host.start()));
