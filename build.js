@@ -5,7 +5,7 @@ build({
   bundle: true,
   outfile: "dist/index.js",
   platform: "node",
-  minify: !true,
+  minify: true,
   external: ["serialport"],
   tsconfig: "./tsconfig.json",
 });

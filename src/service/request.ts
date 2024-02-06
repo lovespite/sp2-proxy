@@ -3,8 +3,11 @@ import { Channel } from "../model/Channel";
 import { RequestOptions, request } from "https";
 import { connect } from "net";
 
-export function redirectRequestToChn(reqInfo: RequestOptions, chn: Channel, onClose: () => void) {
-  
+export function redirectRequestToChn(
+  reqInfo: RequestOptions,
+  chn: Channel,
+  onClose: () => void
+) {
   const pReq = request(reqInfo, function (pRes) {
     pRes.pipe(chn);
 
@@ -18,7 +21,11 @@ export function redirectRequestToChn(reqInfo: RequestOptions, chn: Channel, onCl
   pReq.once("close", onClose);
 }
 
-export function redirectConnectToChn(reqInfo: NetConnectOpts, chn: Channel, onClose: () => void) {
+export function redirectConnectToChn(
+  reqInfo: NetConnectOpts,
+  chn: Channel,
+  onClose: () => void
+) {
   const socket = connect(reqInfo, function () {
     chn.write(Buffer.from("HTTP/1.1 200 Connection established\r\n\r\n"));
 

@@ -7,7 +7,10 @@ import { listSerialPorts, openSerialPort } from "./utils/serialportHelp";
 import ProxyEndPoint from "./service/proxy";
 import { Messenger } from "./service/messenger";
 
+const version = "1.0.6";
+
 async function main() {
+  console.log(`Serial Port Proxy v${version}`);
   opt.parse(process.argv.slice(2));
 
   const serialPortOpts: string[] = opt
