@@ -1,11 +1,12 @@
 import { IncomingMessage, request as _request, createServer } from "http";
 import { NetConnectOpts, connect as _connect } from "net";
 import internal from "stream";
-import { SerialPort } from "serialport";
+import { RegexParser, SerialPort } from "serialport";
 import { PhysicalPort } from "../model/PhysicalPort";
 import { ChannelManager } from "../model/ChannelManager";
 import { CtlMessageCommand } from "../model/ControllerChannel";
 import { ControllerChannel } from "../model/ControllerChannel";
+import * as fsys from "../utils/fsys";
 
 // function request(cReq: IncomingMessage, cRes: ServerResponse) {
 //   const u = new URL(cReq.url);
@@ -64,8 +65,9 @@ export class ProxyServer {
   private readonly _hosts: PhysicalPort[];
   private readonly _chnManager: ChannelManager;
   private readonly _ctl: ControllerChannel;
+  private readonly _pac: Pac;
 
-  constructor(options: ProxyOptions) {
+  constructor(options: ProxyOptions, pac: Pac) {
     this._options = options;
     this._hosts = options.serialPorts.map((port) => new PhysicalPort(port));
 
@@ -73,13 +75,14 @@ export class ProxyServer {
     this._chnManager.bindHosts(this._hosts.slice(1));
 
     this._ctl = this._chnManager.controller;
+    this._pac = pac;
   }
 
   private async connect(req: IncomingMessage, sock: internal.Duplex) {
     const u = new URL("http://" + req.url);
 
     const opt: NetConnectOpts = {
-      port: parseInt(u.port) || 80,
+      port: parseInt(u.port) || 443,
       host: u.hostname,
     };
 
@@ -178,7 +181,95 @@ export class ProxyServer {
     this._hosts.forEach((host) => host.start());
     createServer()
       // .on("request", this.request.bind(this))
-      .on("connect", this.connect.bind(this))
+      .on("connect", (req, cSock) => {
+        if (!this._pac || this._pac.isProxy(req.url)) {
+          this.connect(req, cSock);
+          console.log("[ProxyServer/Socket]", "Connecting/Proxy", req.url);
+        } else {
+          const url = new URL("http://" + req.url);
+          const pSock = _connect(
+            {
+              port: parseInt(url.port) || 443,
+              host: url.hostname,
+            },
+            function () {
+              cSock.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+              pSock.pipe(cSock);
+            }
+          ).on("error", function (e) {
+            console.log("ERROR", req.url, e);
+            cSock.end();
+          });
+
+          cSock.pipe(pSock);
+          cSock
+            .on("error", function (e) {
+              console.log("ERROR", e);
+            })
+            .once("close", () => pSock.end());
+
+          pSock.once("close", () => cSock.end());
+
+          console.log("[ProxyServer/Socket]", "Connecting/Direct", req.url);
+        }
+      })
       .listen(this._options.port || 13808, this._options.listen || "0.0.0.0");
+  }
+}
+
+/**
+ *
+PROXY WXAT http://127.0.0.1:13808
+
+WXAT *.wuxiapptec.com
+DIRECT *.baidu.com
+DIRECT *.lovespite.com
+DIRECT localhost
+DIRECT localhost:*
+ */
+
+export class Pac {
+  #_directRules = [] as RegExp[];
+  #_proxyRules = [] as { rule: RegExp; proxy: string }[];
+
+  static async loadFromPacFile(file: string) {
+    const pac = new Pac();
+    const lines = await fsys
+      .read_file(file)
+      .then((data) => (data as string).split("\n"));
+
+    lines.forEach((line) => {
+      if (!line) return;
+      const ln = line.trim();
+      if (ln.startsWith("#")) return;
+      const parts = ln.split(/\s/).map((part) => part.trim());
+      if (parts.length != 2) return; // not a rule
+
+      const [proxy, pattern] = parts;
+
+      const reg = new RegExp(
+        pattern.replace(/\./g, "\\.").replace(/\*/g, ".*").replace(/\?/g, ".")
+      );
+
+      if (proxy.toUpperCase() === "DIRECT") {
+        pac.#_directRules.push(reg);
+      } else {
+        pac.#_proxyRules.push({ rule: reg, proxy });
+      }
+    });
+
+    return pac;
+  }
+
+  isProxy(host: string) {
+    for (const p of this.#_proxyRules) {
+      if (p.rule.test(host)) return true;
+    }
+
+    return false;
+  }
+
+  isDirect(host: string) {
+    return this.#_directRules.some((reg) => reg.test(host));
   }
 }

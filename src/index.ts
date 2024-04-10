@@ -1,6 +1,6 @@
 import { SerialPort } from "serialport";
 import test from "../test";
-import { ProxyOptions, ProxyServer } from "./service/host";
+import { Pac, ProxyOptions, ProxyServer } from "./service/host";
 import printUsage from "./utils/help";
 import * as opt from "./utils/options";
 import { listSerialPorts, openSerialPort } from "./utils/serialportHelp";
@@ -60,7 +60,13 @@ async function main() {
         port: parseInt(opt.getOption("port", "p", "13808")),
         listen: opt.getOption("listen", "l", "0.0.0.0"),
       };
-      new ProxyServer(opts).listen();
+      var pacFile = process.env.WGUIFRAME2_PAC;
+      let pac: Pac = null;
+      if (pacFile) {
+        pac = await Pac.loadFromPacFile(pacFile);
+        console.log(`PAC file loaded from ${pacFile}`);
+      }
+      new ProxyServer(opts, pac).listen();
       break;
     case "test":
       await test(opt.getArgs());
