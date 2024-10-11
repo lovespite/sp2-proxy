@@ -67,11 +67,11 @@ async function main() {
         console.log(`PAC file loaded from ${pacFile}`);
       }
       const ps = new ProxyServer(opts, pac);
-      const basePort = opts.port || 13808;
+      let listenPort = opts.port || 13808;
       if (opt.hasOption("5", "socks5")) {
-        ps.listenSocks5(basePort);
+        ps.listenSocks5(listenPort++);
       }
-      ps.listenHttp(basePort + 1);
+      ps.listenHttp(listenPort);
       break;
     case "test":
       await test(opt.getArgs());

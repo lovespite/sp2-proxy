@@ -1,4 +1,5 @@
 实现了串口的多路复用
+
 同一个串口可以切分多个信道独立通信
 
 基于以上功能实现
@@ -6,6 +7,7 @@
 --- 将http代理转发到串口
 --- 消息、文件、图片数据传输
 --- 远程Shell
+--- 实现了Socks5协议
 
 注：功能1需要代理端启用 ```host``` 命令， 并在流量出口端启用 ```proxy``` 命令
 注：功能2、3需要两边同时启用 ```msg``` 命令
@@ -48,6 +50,10 @@ Commands:
       --port=<port>, -p
         Specify the port to listen.
         Default: 13808
+      
+      --socks5, -5
+        Enable socks5 protocol.
+        When enabled, socks5 use the specified port and http use the specified port + 1.
 
   msg [options]
     Send text/image/file to the specified channel. Or start remote shell.

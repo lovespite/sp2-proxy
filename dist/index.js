@@ -41058,7 +41058,16 @@ var ProxyServer = class {
     this._started = true;
     this._hosts.forEach((host) => host.start());
   }
-  listenOnSocks5(port) {
+  async socks5Request(req, proxy) {
+    const host = req.domain || req.ip;
+    const port = req.port;
+    console.log("[ProxyServer/Socks5]", "Connecting", host, port);
+    this.connect(proxy.socket, 5, null, host, port, () => {
+      proxy.replySuccess();
+      console.log("[ProxyServer/Socks5]", "Connected", host, port);
+    });
+  }
+  listenSocks5(port) {
     this.startHosts();
     socks5({
       host: this._options.listen || "0.0.0.0",
@@ -41066,26 +41075,7 @@ var ProxyServer = class {
       callback: this.socks5Request.bind(this)
     });
   }
-  async socks5Request(req, proxy) {
-    const targetHostname = req.domain || req.ip;
-    const targetPort = req.port;
-    console.log(
-      "[ProxyServer/Socks5]",
-      "Connecting",
-      targetHostname,
-      targetPort
-    );
-    this.connect(proxy.socket, 5, null, targetHostname, targetPort, () => {
-      proxy.replySuccess();
-      console.log(
-        "[ProxyServer/Socks5]",
-        "Connected",
-        targetHostname,
-        targetPort
-      );
-    });
-  }
-  listen(port) {
+  listenHttp(port) {
     this.startHosts();
     (0, import_http.createServer)().on("listening", () => {
       console.log("[ProxyServer/Http]", "Listening on", port);
@@ -41536,7 +41526,7 @@ function notFound(res) {
 var import_os = __toESM(require("os"));
 
 // src/vc.js
-var version = "1.0.40";
+var version = "1.0.41";
 
 // src/service/messenger.ts
 var import_child_process = require("child_process");
@@ -42246,11 +42236,11 @@ async function main() {
         console.log(`PAC file loaded from ${pacFile}`);
       }
       const ps = new ProxyServer(opts, pac);
-      const basePort = opts.port || 13808;
+      let listenPort = opts.port || 13808;
       if (hasOption("5", "socks5")) {
-        ps.listenOnSocks5(basePort);
+        ps.listenSocks5(listenPort++);
       }
-      ps.listen(basePort + 1);
+      ps.listenHttp(listenPort);
       break;
     case "test":
       await test(getArgs());
