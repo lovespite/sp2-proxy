@@ -80,7 +80,7 @@ async function main() {
       serialPorts = await openSerialPorts([serialPortOpts[0]], baudRates);
       const msg = new Messenger(serialPorts[0]);
       msg.start({
-        port: parseInt(opt.getOption("port", "p", "13809")),
+        port: parseInt(opt.getOption("port", "p", "13810")),
         listen: opt.getOption("listen", "l", "127.0.0.1"),
       });
       break;
