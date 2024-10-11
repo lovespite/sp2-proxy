@@ -14,7 +14,7 @@ export function socks5({ host, port, callback }: Socks5ProxyOptions) {
   server
     .listen(port, host)
     .on("listening", () => {
-      console.log(`[ProxyServer/Socks5] Listening on ${port}`);
+      console.log(`[ProxyServer/Socks5] Listening on`, port);
     })
     .on("error", (err) => {
       console.error("[ProxyServer/Socks5] Host error", err);

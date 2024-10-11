@@ -87,43 +87,39 @@ export class ProxyServer {
     }
   }
 
+  private _started = false;
   private startHosts() {
+    if (this._started) return;
+    this._started = true;
     this._hosts.forEach((host) => host.start());
   }
 
-  public listenOnSocks5() {
+  private async socks5Request(req: S5ProxyRequest, proxy: S5Proxy) {
+    const host = req.domain || req.ip;
+    const port = req.port;
+    console.log("[ProxyServer/Socks5]", "Connecting", host, port);
+
+    this.connect(proxy.socket, 5, null, host, port, () => {
+      proxy.replySuccess();
+      console.log("[ProxyServer/Socks5]", "Connected", host, port);
+    });
+  }
+
+  public listenSocks5(port: number) {
     this.startHosts();
     socks5({
       host: this._options.listen || "0.0.0.0",
-      port: this._options.port || 13808,
+      port,
       callback: this.socks5Request.bind(this),
     });
   }
 
-  private async socks5Request(req: S5ProxyRequest, proxy: S5Proxy) {
-    const targetHostname = req.domain || req.ip;
-    const targetPort = req.port;
-    console.log(
-      "[ProxyServer/Socks5]",
-      "Connecting",
-      targetHostname,
-      targetPort
-    );
-
-    this.connect(proxy.socket, 5, null, targetHostname, targetPort, () => {
-      proxy.replySuccess();
-      console.log(
-        "[ProxyServer/Socks5]",
-        "Connected",
-        targetHostname,
-        targetPort
-      );
-    });
-  }
-
-  public listen() {
+  public listenHttp(port: number) {
     this.startHosts();
     createServer()
+      .on("listening", () => {
+        console.log("[ProxyServer/Http]", "Listening on", port);
+      })
       // .on("request", this.request.bind(this))
       .on("connect", (req, cSock) => {
         if (!this._pac || this._pac.isProxy(req.url)) {
@@ -157,7 +153,7 @@ export class ProxyServer {
           console.log("[ProxyServer/Socket]", "Connecting/Direct", req.url);
         }
       })
-      .listen(this._options.port || 13808, this._options.listen || "0.0.0.0");
+      .listen(port, this._options.listen || "0.0.0.0");
   }
 }
 

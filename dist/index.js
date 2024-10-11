@@ -40981,7 +40981,7 @@ var S5Proxy = class {
 function socks5({ host, port, callback }) {
   const server = import_net2.default.createServer();
   server.listen(port, host).on("listening", () => {
-    console.log(`[ProxyServer/Socks5] Listening on ${port}`);
+    console.log(`[ProxyServer/Socks5] Listening on`, port);
   }).on("error", (err) => {
     console.error("[ProxyServer/Socks5] Host error", err);
   }).on("connection", (socket) => {
@@ -41051,14 +41051,18 @@ var ProxyServer = class {
       sock.end();
     }
   }
+  _started = false;
   startHosts() {
+    if (this._started)
+      return;
+    this._started = true;
     this._hosts.forEach((host) => host.start());
   }
-  listenOnSocks5() {
+  listenOnSocks5(port) {
     this.startHosts();
     socks5({
       host: this._options.listen || "0.0.0.0",
-      port: this._options.port || 13808,
+      port,
       callback: this.socks5Request.bind(this)
     });
   }
@@ -41081,9 +41085,11 @@ var ProxyServer = class {
       );
     });
   }
-  listen() {
+  listen(port) {
     this.startHosts();
-    (0, import_http.createServer)().on("connect", (req, cSock) => {
+    (0, import_http.createServer)().on("listening", () => {
+      console.log("[ProxyServer/Http]", "Listening on", port);
+    }).on("connect", (req, cSock) => {
       if (!this._pac || this._pac.isProxy(req.url)) {
         this.connect(cSock, 0, req, null, null);
         console.log("[ProxyServer/Socket]", "Connecting/Proxy", req.url);
@@ -41109,7 +41115,7 @@ var ProxyServer = class {
         pSock.once("close", () => cSock.end());
         console.log("[ProxyServer/Socket]", "Connecting/Direct", req.url);
       }
-    }).listen(this._options.port || 13808, this._options.listen || "0.0.0.0");
+    }).listen(port, this._options.listen || "0.0.0.0");
   }
 };
 var Pac = class _Pac {
@@ -41530,7 +41536,7 @@ function notFound(res) {
 var import_os = __toESM(require("os"));
 
 // src/vc.js
-var version = "1.0.37";
+var version = "1.0.40";
 
 // src/service/messenger.ts
 var import_child_process = require("child_process");
@@ -42240,13 +42246,11 @@ async function main() {
         console.log(`PAC file loaded from ${pacFile}`);
       }
       const ps = new ProxyServer(opts, pac);
+      const basePort = opts.port || 13808;
       if (hasOption("5", "socks5")) {
-        ps.listenOnSocks5();
-        console.log(`Socks5 proxy server listening on ${opts.listen}:${opts.port}`);
-      } else {
-        ps.listen();
-        console.log(`Http proxy server listening on ${opts.listen}:${opts.port}`);
+        ps.listenOnSocks5(basePort);
       }
+      ps.listen(basePort + 1);
       break;
     case "test":
       await test(getArgs());
