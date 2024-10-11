@@ -3,7 +3,7 @@ import { PhysicalPort } from "../model/PhysicalPort";
 import { ControlMessage, CtlMessageCommand } from "../model/ControllerChannel";
 import { RequestOptions } from "http";
 import { TcpNetConnectOpts } from "net";
-import { redirectRequestToChn, redirectConnectToChn } from "./request";
+import * as request from "./request";
 import { ProxyOptions } from "./host";
 import { Rule } from "./rule";
 
@@ -22,9 +22,10 @@ export default class ProxyEndPoint {
     switch (msg.cmd) {
       case CtlMessageCommand.CONNECT: {
         //remote client want a socket connection
-        const { cid, opt } = msg.data as {
+        const { cid, opt, v } = msg.data as {
           cid: number;
           opt: TcpNetConnectOpts;
+          v: number;
         };
         const channel = this._channelManager.get(cid);
 
@@ -45,10 +46,19 @@ export default class ProxyEndPoint {
         );
 
         if (channel) {
-          redirectConnectToChn(opt, channel, () => {
-            console.log("[ProxyEndPoint/Socket]", cid, "Channel is closing.");
-            this._channelManager.kill(channel, 0x1);
-          });
+          if (v === 5) {
+            // socks5 proxy
+            request.redirectSocks5ToChn(opt, channel, () => {
+              console.log("[ProxyEndPoint/Socks5]", cid, "Channel is closing.");
+              this._channelManager.kill(channel, 0x1);
+            });
+          } else if (v === 0) {
+            // http proxy
+            request.redirectConnectToChn(opt, channel, () => {
+              console.log("[ProxyEndPoint/Socket]", cid, "Channel is closing.");
+              this._channelManager.kill(channel, 0x1);
+            });
+          }
         } else {
           console.log("[ProxyEndPoint/Socket]", "Channel not found:", cid);
         }
@@ -70,7 +80,7 @@ export default class ProxyEndPoint {
         );
 
         if (channel) {
-          redirectRequestToChn(opt as RequestOptions, channel, () => {
+          request.redirectRequestToChn(opt as RequestOptions, channel, () => {
             console.log("[ProxyEndPoint/Request]", cid, "Channel is closing.");
             this._channelManager.kill(channel, 0x2);
           });

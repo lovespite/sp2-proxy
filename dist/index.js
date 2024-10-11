@@ -1301,8 +1301,8 @@ var require_node = __commonJS({
           break;
         case "PIPE":
         case "TCP":
-          var net = require("net");
-          stream2 = new net.Socket({
+          var net3 = require("net");
+          stream2 = new net3.Socket({
             fd: fd2,
             readable: false,
             writable: true
@@ -20579,8 +20579,8 @@ var require_node2 = __commonJS({
           break;
         case "PIPE":
         case "TCP":
-          var net = require("net");
-          stream2 = new net.Socket({
+          var net3 = require("net");
+          stream2 = new net3.Socket({
             fd: fd2,
             readable: false,
             writable: true
@@ -21298,8 +21298,8 @@ var require_node3 = __commonJS({
           break;
         case "PIPE":
         case "TCP":
-          var net = require("net");
-          stream2 = new net.Socket({
+          var net3 = require("net");
+          stream2 = new net3.Socket({
             fd: fd2,
             readable: false,
             writable: true
@@ -22846,8 +22846,8 @@ var require_node4 = __commonJS({
           break;
         case "PIPE":
         case "TCP":
-          var net = require("net");
-          stream2 = new net.Socket({
+          var net3 = require("net");
+          stream2 = new net3.Socket({
             fd: fd2,
             readable: false,
             writable: true
@@ -22893,14 +22893,14 @@ var require_etag = __commonJS({
   "node_modules/etag/index.js"(exports2, module2) {
     "use strict";
     module2.exports = etag;
-    var crypto2 = require("crypto");
+    var crypto3 = require("crypto");
     var Stats = require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash2 = crypto2.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash2 = crypto3.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash2 + '"';
     }
@@ -23064,9 +23064,9 @@ var require_mime = __commonJS({
   }
 });
 
-// node_modules/send/node_modules/ms/index.js
+// node_modules/ms/index.js
 var require_ms5 = __commonJS({
-  "node_modules/send/node_modules/ms/index.js"(exports2, module2) {
+  "node_modules/ms/index.js"(exports2, module2) {
     var s = 1e3;
     var m = s * 60;
     var h = m * 60;
@@ -25823,13 +25823,13 @@ var require_request = __commonJS({
 // node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "node_modules/cookie-signature/index.js"(exports2) {
-    var crypto2 = require("crypto");
+    var crypto3 = require("crypto");
     exports2.sign = function(val, secret) {
       if ("string" != typeof val)
         throw new TypeError("Cookie value must be provided as a string.");
       if ("string" != typeof secret)
         throw new TypeError("Secret string must be provided.");
-      return val + "." + crypto2.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
+      return val + "." + crypto3.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
     };
     exports2.unsign = function(val, secret) {
       if ("string" != typeof val)
@@ -25840,7 +25840,7 @@ var require_cookie_signature = __commonJS({
       return sha1(mac) == sha1(val) ? str : false;
     };
     function sha1(str) {
-      return crypto2.createHash("sha1").update(str).digest("hex");
+      return crypto3.createHash("sha1").update(str).digest("hex");
     }
   }
 });
@@ -26790,7 +26790,7 @@ var require_express2 = __commonJS({
 // node_modules/base64id/lib/base64id.js
 var require_base64id = __commonJS({
   "node_modules/base64id/lib/base64id.js"(exports2, module2) {
-    var crypto2 = require("crypto");
+    var crypto3 = require("crypto");
     var Base64Id = function() {
     };
     Base64Id.prototype.getRandomBytes = function(bytes) {
@@ -26798,12 +26798,12 @@ var require_base64id = __commonJS({
       var self = this;
       bytes = bytes || 12;
       if (bytes > BUFFER_SIZE) {
-        return crypto2.randomBytes(bytes);
+        return crypto3.randomBytes(bytes);
       }
       var bytesInBuffer = parseInt(BUFFER_SIZE / bytes);
       var threshold = parseInt(bytesInBuffer * 0.85);
       if (!threshold) {
-        return crypto2.randomBytes(bytes);
+        return crypto3.randomBytes(bytes);
       }
       if (this.bytesBufferIndex == null) {
         this.bytesBufferIndex = -1;
@@ -26815,14 +26815,14 @@ var require_base64id = __commonJS({
       if (this.bytesBufferIndex == -1 || this.bytesBufferIndex > threshold) {
         if (!this.isGeneratingBytes) {
           this.isGeneratingBytes = true;
-          crypto2.randomBytes(BUFFER_SIZE, function(err, bytes2) {
+          crypto3.randomBytes(BUFFER_SIZE, function(err, bytes2) {
             self.bytesBuffer = bytes2;
             self.bytesBufferIndex = 0;
             self.isGeneratingBytes = false;
           });
         }
         if (this.bytesBufferIndex == -1) {
-          return crypto2.randomBytes(bytes);
+          return crypto3.randomBytes(bytes);
         }
       }
       var result = this.bytesBuffer.slice(bytes * this.bytesBufferIndex, bytes * (this.bytesBufferIndex + 1));
@@ -26836,7 +26836,7 @@ var require_base64id = __commonJS({
       }
       this.sequenceNumber = this.sequenceNumber + 1 | 0;
       rand.writeInt32BE(this.sequenceNumber, 11);
-      if (crypto2.randomBytes) {
+      if (crypto3.randomBytes) {
         this.getRandomBytes(12).copy(rand);
       } else {
         [0, 4, 8].forEach(function(i) {
@@ -27590,9 +27590,9 @@ var require_parser_v3 = __commonJS({
   }
 });
 
-// node_modules/ms/index.js
+// node_modules/debug/node_modules/ms/index.js
 var require_ms6 = __commonJS({
-  "node_modules/ms/index.js"(exports2, module2) {
+  "node_modules/debug/node_modules/ms/index.js"(exports2, module2) {
     var s = 1e3;
     var m = s * 60;
     var h = m * 60;
@@ -30737,7 +30737,7 @@ var require_receiver = __commonJS({
 var require_sender = __commonJS({
   "node_modules/ws/lib/sender.js"(exports2, module2) {
     "use strict";
-    var net = require("net");
+    var net3 = require("net");
     var tls = require("tls");
     var { randomFillSync } = require("crypto");
     var PerMessageDeflate = require_permessage_deflate();
@@ -31551,7 +31551,7 @@ var require_websocket2 = __commonJS({
     var EventEmitter = require("events");
     var https = require("https");
     var http = require("http");
-    var net = require("net");
+    var net3 = require("net");
     var tls = require("tls");
     var { randomBytes, createHash } = require("crypto");
     var { Readable } = require("stream");
@@ -32281,12 +32281,12 @@ var require_websocket2 = __commonJS({
     }
     function netConnect(options) {
       options.path = options.socketPath;
-      return net.connect(options);
+      return net3.connect(options);
     }
     function tlsConnect(options) {
       options.path = void 0;
       if (!options.servername && options.servername !== "") {
-        options.servername = net.isIP(options.host) ? "" : options.host;
+        options.servername = net3.isIP(options.host) ? "" : options.host;
       }
       return tls.connect(options);
     }
@@ -32570,7 +32570,7 @@ var require_websocket_server = __commonJS({
     var EventEmitter = require("events");
     var http = require("http");
     var https = require("https");
-    var net = require("net");
+    var net3 = require("net");
     var tls = require("tls");
     var { createHash } = require("crypto");
     var extension = require_extension();
@@ -39155,7 +39155,7 @@ var require_main = __commonJS({
     var fs3 = require("fs");
     var path2 = require("path");
     var os2 = require("os");
-    var crypto2 = require("crypto");
+    var crypto3 = require("crypto");
     var packageJson = require_package2();
     var version2 = packageJson.version;
     var LINE = /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/mg;
@@ -39327,7 +39327,7 @@ var require_main = __commonJS({
         return { error: e };
       }
     }
-    function config(options) {
+    function config2(options) {
       if (_dotenvKey(options).length === 0) {
         return DotenvModule.configDotenv(options);
       }
@@ -39345,7 +39345,7 @@ var require_main = __commonJS({
       const authTag = ciphertext.subarray(-16);
       ciphertext = ciphertext.subarray(12, -16);
       try {
-        const aesgcm = crypto2.createDecipheriv("aes-256-gcm", key, nonce);
+        const aesgcm = crypto3.createDecipheriv("aes-256-gcm", key, nonce);
         aesgcm.setAuthTag(authTag);
         return `${aesgcm.update(ciphertext)}${aesgcm.final()}`;
       } catch (error) {
@@ -39394,7 +39394,7 @@ var require_main = __commonJS({
       configDotenv,
       _configVault,
       _parseVault,
-      config,
+      config: config2,
       decrypt,
       parse: parse2,
       populate
@@ -40252,7 +40252,7 @@ async function channel_test_client(portName, file) {
 
 // src/service/host.ts
 var import_http = require("http");
-var import_net = require("net");
+var import_net3 = require("net");
 
 // src/utils/fsys.ts
 var import_fs = __toESM(require("fs"));
@@ -40381,6 +40381,623 @@ async function hash_file(path2, algorithm) {
   return hash2.digest("hex");
 }
 
+// src/service/socks5/index.ts
+var import_net2 = __toESM(require("net"));
+
+// src/service/socks5/proxy.ts
+var import_dns = __toESM(require("dns"));
+var import_net = __toESM(require("net"));
+
+// src/service/socks5/utils.ts
+function ipbytes(ip) {
+  return ip.split(".").map((v) => parseInt(v));
+}
+
+// src/service/socks5/proxy.ts
+var import_console = require("console");
+
+// node_modules/uuid/dist/esm-node/stringify.js
+var byteToHex = [];
+for (let i = 0; i < 256; ++i) {
+  byteToHex.push((i + 256).toString(16).slice(1));
+}
+function unsafeStringify(arr, offset = 0) {
+  return (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + "-" + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + "-" + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + "-" + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + "-" + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase();
+}
+
+// node_modules/uuid/dist/esm-node/rng.js
+var import_node_crypto = __toESM(require("node:crypto"));
+var rnds8Pool = new Uint8Array(256);
+var poolPtr = rnds8Pool.length;
+function rng() {
+  if (poolPtr > rnds8Pool.length - 16) {
+    import_node_crypto.default.randomFillSync(rnds8Pool);
+    poolPtr = 0;
+  }
+  return rnds8Pool.slice(poolPtr, poolPtr += 16);
+}
+
+// node_modules/uuid/dist/esm-node/v1.js
+var _nodeId;
+var _clockseq;
+var _lastMSecs = 0;
+var _lastNSecs = 0;
+function v1(options, buf, offset) {
+  let i = buf && offset || 0;
+  const b = buf || new Array(16);
+  options = options || {};
+  let node = options.node;
+  let clockseq = options.clockseq;
+  if (!options._v6) {
+    if (!node) {
+      node = _nodeId;
+    }
+    if (clockseq == null) {
+      clockseq = _clockseq;
+    }
+  }
+  if (node == null || clockseq == null) {
+    const seedBytes = options.random || (options.rng || rng)();
+    if (node == null) {
+      node = [seedBytes[0], seedBytes[1], seedBytes[2], seedBytes[3], seedBytes[4], seedBytes[5]];
+      if (!_nodeId && !options._v6) {
+        node[0] |= 1;
+        _nodeId = node;
+      }
+    }
+    if (clockseq == null) {
+      clockseq = (seedBytes[6] << 8 | seedBytes[7]) & 16383;
+      if (_clockseq === void 0 && !options._v6) {
+        _clockseq = clockseq;
+      }
+    }
+  }
+  let msecs = options.msecs !== void 0 ? options.msecs : Date.now();
+  let nsecs = options.nsecs !== void 0 ? options.nsecs : _lastNSecs + 1;
+  const dt = msecs - _lastMSecs + (nsecs - _lastNSecs) / 1e4;
+  if (dt < 0 && options.clockseq === void 0) {
+    clockseq = clockseq + 1 & 16383;
+  }
+  if ((dt < 0 || msecs > _lastMSecs) && options.nsecs === void 0) {
+    nsecs = 0;
+  }
+  if (nsecs >= 1e4) {
+    throw new Error("uuid.v1(): Can't create more than 10M uuids/sec");
+  }
+  _lastMSecs = msecs;
+  _lastNSecs = nsecs;
+  _clockseq = clockseq;
+  msecs += 122192928e5;
+  const tl = ((msecs & 268435455) * 1e4 + nsecs) % 4294967296;
+  b[i++] = tl >>> 24 & 255;
+  b[i++] = tl >>> 16 & 255;
+  b[i++] = tl >>> 8 & 255;
+  b[i++] = tl & 255;
+  const tmh = msecs / 4294967296 * 1e4 & 268435455;
+  b[i++] = tmh >>> 8 & 255;
+  b[i++] = tmh & 255;
+  b[i++] = tmh >>> 24 & 15 | 16;
+  b[i++] = tmh >>> 16 & 255;
+  b[i++] = clockseq >>> 8 | 128;
+  b[i++] = clockseq & 255;
+  for (let n = 0; n < 6; ++n) {
+    b[i + n] = node[n];
+  }
+  return buf || unsafeStringify(b);
+}
+var v1_default = v1;
+
+// src/service/socks5/constant.ts
+var SOCKS_VERSION = 5;
+var STATE = {
+  METHOD_NEGOTIATION: 0,
+  AUTHENTICATION: 1,
+  REQUEST_CONNECT: 2,
+  PROXY_FORWARD: 3
+};
+var METHODS = {
+  NO_AUTH: [0, "no_auth"],
+  GSSAPI: [1, "gssapi"],
+  USERNAME_PASSWD: [2, "username_password"],
+  NO_ACCEPTABLE: [255, "no_acceptable_methods"]
+  // get: function (method: number): UnionType | false {
+  //   switch (method) {
+  //     case METHODS.NO_AUTH[0]:
+  //       return METHODS.NO_AUTH as UnionType;
+  //     case METHODS.GSSAPI[0]:
+  //       return METHODS.GSSAPI as UnionType;
+  //     case METHODS.USERNAME_PASSWD[0]:
+  //       return METHODS.USERNAME_PASSWD as UnionType;
+  //   }
+  //   console.error(`method [${method}] is not supported`);
+  //   return false;
+  // },
+};
+var REQUEST_CMD = {
+  CONNECT: [1, "connect"],
+  BIND: [2, "bind"],
+  UDP_ASSOCIATE: [3, "udp_associate"]
+  // get: function (cmd: number): UnionType | false {
+  //   switch (cmd) {
+  //     case REQUEST_CMD.CONNECT[0]:
+  //       return REQUEST_CMD.CONNECT as UnionType;
+  //     case REQUEST_CMD.BIND[0]:
+  //       return REQUEST_CMD.BIND as UnionType;
+  //     case REQUEST_CMD.UDP_ASSOCIATE[0]:
+  //       return REQUEST_CMD.UDP_ASSOCIATE as UnionType;
+  //   }
+  //   console.error(`cmd [${cmd}] is not supported`);
+  //   return false;
+  // },
+};
+var RSV = 0;
+var ATYP = {
+  IPV4: [1, "ipv4"],
+  FQDN: [3, "domain name"],
+  IPV6: [4, "ipv6"]
+  // get: function (atyp: number): UnionType | false {
+  //   switch (atyp) {
+  //     case ATYP.IPV4[0]:
+  //       return ATYP.IPV4 as UnionType;
+  //     case ATYP.FQDN[0]:
+  //       return ATYP.FQDN as UnionType;
+  //     case ATYP.IPV6[0]:
+  //       return ATYP.IPV6 as UnionType;
+  //   }
+  //   console.error(`atpy [${atyp}] is not supported`);
+  //   return false;
+  // },
+};
+var REP = {
+  SUCCEEDED: [0, "succeeded"],
+  GENERAL_FAILURE: [1, "general SOCKS server failure"],
+  NOT_ALLOWED: [2, "connection not allowed by ruleset"],
+  NETWORK_UNREACHABLE: [3, "Network unreachable"],
+  HOST_UNREACHABLE: [4, "Host unreachable"],
+  CONNECTION_REFUSED: [5, "Connection refused"],
+  TTL_EXPIRED: [6, "TTL expired"],
+  COMMAND_NOT_SUPPORTED: [7, "Command not supported"],
+  ADDRESS_TYPE_NOT_SUPPORTED: [8, "Address type not supported"]
+};
+var USERNAME_PASSWD_AUTH_VERSION = 1;
+var AUTH_STATUS = {
+  SUCCESS: 0,
+  FAILURE: 1
+};
+var Querable = {
+  get(key, from) {
+    for (let k in from) {
+      if (from[k][0] === key) {
+        return from[k];
+      }
+    }
+    return false;
+  }
+};
+var constant_default = {
+  SOCKS_VERSION,
+  STATE,
+  METHODS,
+  REQUEST_CMD,
+  RSV,
+  ATYP,
+  REP,
+  USERNAME_PASSWD_AUTH_VERSION,
+  AUTH_STATUS,
+  Querable
+};
+
+// src/service/socks5/proxy.ts
+var config = {
+  auth_method: constant_default.METHODS.NO_AUTH,
+  username: "admin",
+  passwd: "admin"
+};
+var S5Proxy = class {
+  _callback = null;
+  constructor(socket) {
+    this._socket = socket;
+    this._session = {
+      id: v1_default(),
+      buffer: Buffer.alloc(0),
+      offset: 0,
+      state: constant_default.STATE.METHOD_NEGOTIATION
+    };
+    socket.on("data", this.handle.bind(this));
+  }
+  set onConnection(callback) {
+    this._callback = callback;
+  }
+  get sessionId() {
+    return this._session.id;
+  }
+  /**
+   * proxy socket
+   */
+  _socket;
+  get socket() {
+    return this._socket;
+  }
+  /**
+   * session
+   */
+  _session;
+  checkNull(offset, buf = null) {
+    buf = buf || this._session.buffer;
+    if (!buf)
+      return true;
+    return typeof buf[offset] === void 0;
+  }
+  /**
+   * The client connects to the server, and sends a version identifier/method selection message:
+   * +----+----------+----------+
+   * |VER | NMETHODS | METHODS  |
+   * +----+----------+----------+
+   * | 1  |    1     | 1 to 255 |
+   * +----+----------+----------+
+   */
+  parseMethods() {
+    const buf = this._session.buffer;
+    let offset = this._session.offset;
+    if (this.checkNull(offset))
+      return false;
+    let socksVersion = buf[offset++];
+    (0, import_console.assert)(
+      socksVersion == constant_default.SOCKS_VERSION,
+      `[Socks5/Connection] ${this._session.id} only support socks version 5, got [${socksVersion}]`
+    );
+    if (socksVersion != constant_default.SOCKS_VERSION) {
+      this._socket.end();
+      return false;
+    }
+    if (this.checkNull(offset))
+      return false;
+    let methodLen = buf[offset++];
+    (0, import_console.assert)(
+      methodLen >= 1 && methodLen <= 255,
+      `[Socks5/Connection] ${this._session.id} methodLen's value [${methodLen}] is invalid`
+    );
+    if (this.checkNull(offset + methodLen - 1))
+      return false;
+    let methods = [];
+    for (let i = 0; i < methodLen; i++) {
+      let method = constant_default.Querable.get(buf[offset++], constant_default.METHODS);
+      if (method) {
+        methods.push(method);
+      }
+    }
+    console.log(
+      `[Socks5/Connection] ${this._session.id} SOCKS_VERSION: ${socksVersion}`
+    );
+    console.log(`[Socks5/Connection] ${this._session.id} METHODS: `, methods);
+    this._session.offset = offset;
+    return methods;
+  }
+  /** socks server select auth method */
+  selectMethod(methods) {
+    let method = constant_default.METHODS.NO_ACCEPTABLE;
+    for (let i = 0; i < methods.length; i++) {
+      if (methods[i] == config.auth_method) {
+        method = config.auth_method;
+      }
+    }
+    this._session.method = method;
+    return method;
+  }
+  /**
+   * The server selects from one of the methods given in METHODS, and sends a METHOD selection message
+   * +----+--------+
+   * |VER | METHOD |
+   * +----+--------+
+   * | 1  |   1    |
+   * +----+--------+
+   */
+  replyMethod(method) {
+    this._socket.write(Buffer.from([constant_default.SOCKS_VERSION, method[0]]));
+  }
+  /**
+   * This begins with the client producing a Username/Password request:
+   * +----+------+----------+------+----------+
+   * |VER | ULEN |  UNAME   | PLEN |  PASSWD  |
+   * +----+------+----------+------+----------+
+   * | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
+   * +----+------+----------+------+----------+
+   */
+  parseUsernamePasswd() {
+    const buf = this._session.buffer;
+    let offset = this._session.offset;
+    const req = {
+      username: "",
+      passwd: ""
+    };
+    if (this.checkNull(offset))
+      return false;
+    let authVersion = buf[offset++];
+    (0, import_console.assert)(
+      authVersion == constant_default.USERNAME_PASSWD_AUTH_VERSION,
+      `[Socks5/Connection] ${this._session.id} only support auth version ${constant_default.USERNAME_PASSWD_AUTH_VERSION}, got [${authVersion}]`
+    );
+    if (authVersion != constant_default.USERNAME_PASSWD_AUTH_VERSION) {
+      this._socket.end();
+      return false;
+    }
+    if (this.checkNull(offset))
+      return false;
+    let uLen = buf[offset++];
+    (0, import_console.assert)(
+      uLen >= 1 && uLen <= 255,
+      `[Socks5/Connection] ${this._session.id} got wrong ULEN [${uLen}]`
+    );
+    if (uLen >= 1 && uLen <= 255) {
+      if (this.checkNull(offset + uLen - 1))
+        return false;
+      req.username = buf.slice(offset, offset + uLen).toString("utf8");
+      offset += uLen;
+    } else {
+      this._socket.end();
+      return false;
+    }
+    if (this.checkNull(offset))
+      return false;
+    let pLen = buf[offset++];
+    (0, import_console.assert)(
+      pLen >= 1 && pLen <= 255,
+      `[Socks5/Connection] ${this._session.id} got wrong PLEN [${pLen}]`
+    );
+    if (pLen >= 1 && pLen <= 255) {
+      if (this.checkNull(offset + pLen - 1))
+        return false;
+      req.passwd = buf.toString("utf8", offset, offset + pLen);
+      offset += pLen;
+    } else {
+      this._socket.end();
+      return false;
+    }
+    this._session.offset = offset;
+    return req;
+  }
+  /**
+   * The server verifies the supplied UNAME and PASSWD, and sends the following response:
+   *  +----+--------+
+   *  |VER | STATUS |
+   *  +----+--------+
+   *  | 1  |   1    |
+   *  +----+--------+
+   */
+  replyAuth(succeeded) {
+    let reply = [
+      constant_default.USERNAME_PASSWD_AUTH_VERSION,
+      succeeded ? constant_default.AUTH_STATUS.SUCCESS : constant_default.AUTH_STATUS.FAILURE
+    ];
+    if (succeeded) {
+      this._socket.write(Buffer.from(reply));
+    } else {
+      this._socket.end(Buffer.from(reply));
+    }
+  }
+  /**
+   * The SOCKS request is formed as follows:
+   * +----+-----+-------+------+----------+----------+
+   * |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
+   * +----+-----+-------+------+----------+----------+
+   * | 1  |  1  | X'00' |  1   | Variable |    2     |
+   * +----+-----+-------+------+----------+----------+
+   */
+  parseRequests() {
+    const buf = this._session.buffer;
+    let offset = this._session.offset;
+    if (this.checkNull(offset))
+      return false;
+    let socksVersion = buf[offset++];
+    (0, import_console.assert)(
+      socksVersion == constant_default.SOCKS_VERSION,
+      `[Socks5/Connection] ${this._session.id} only support socks version 5, got [${socksVersion}]`
+    );
+    if (socksVersion != constant_default.SOCKS_VERSION) {
+      this._socket.end();
+      return false;
+    }
+    if (this.checkNull(offset))
+      return false;
+    const cmd = constant_default.Querable.get(buf[offset++], constant_default.REQUEST_CMD) || void 0;
+    if (!cmd || cmd != constant_default.REQUEST_CMD.CONNECT) {
+      this._socket.end();
+      return false;
+    }
+    if (this.checkNull(offset))
+      return false;
+    const rsv = buf[offset++];
+    (0, import_console.assert)(
+      rsv == constant_default.RSV,
+      `[Socks5/Connection] ${this._session.id} rsv should be ${constant_default.RSV}`
+    );
+    if (this.checkNull(offset))
+      return false;
+    const atyp = constant_default.Querable.get(buf[offset++], constant_default.ATYP) || void 0;
+    let ipArr = null;
+    let domain = null;
+    if (!atyp) {
+      this._socket.end();
+      return false;
+    } else if (atyp == constant_default.ATYP.IPV4) {
+      const ipLen = 4;
+      if (this.checkNull(offset + ipLen - 1))
+        return false;
+      ipArr = buf.subarray(offset, offset + ipLen);
+      offset += ipLen;
+    } else if (atyp == constant_default.ATYP.FQDN) {
+      if (this.checkNull(offset))
+        return false;
+      let domainLen = buf[offset++];
+      if (this.checkNull(offset + domainLen - 1))
+        return false;
+      domain = buf.toString("utf8", offset, offset + domainLen);
+      offset += domainLen;
+    } else {
+      this._socket.end();
+      return false;
+    }
+    let portLen = 2;
+    if (this.checkNull(offset + portLen - 1))
+      return false;
+    const port = buf.readUInt16BE(offset);
+    offset += portLen;
+    const req = {
+      cmd,
+      rsv,
+      atyp,
+      port,
+      ip: ipArr ? ipArr.join(".") : null,
+      domain
+    };
+    this._session.offset = offset;
+    return req;
+  }
+  /**
+   * The server evaluates the request, and returns a reply formed as follows:
+   * +----+-----+-------+------+----------+----------+
+   * |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
+   * +----+-----+-------+------+----------+----------+
+   * | 1  |  1  | X'00' |  1   | Variable |    2     |
+   * +----+-----+-------+------+----------+----------+
+   */
+  dstConnect(req) {
+    if (this._callback) {
+      this._callback(req, this);
+    } else {
+      let dstHost = req.domain || req.ip;
+      import_dns.default.lookup(dstHost, { family: 4 }, (err, ip) => {
+        if (err || !ip) {
+          let reply = [
+            constant_default.SOCKS_VERSION,
+            constant_default.REP.HOST_UNREACHABLE[0],
+            constant_default.RSV,
+            constant_default.ATYP.IPV4[0]
+          ].concat(ipbytes("127.0.0.1")).concat([0, 0]);
+          this._socket.end(Buffer.from(reply));
+        } else {
+          this.connect(req, ip);
+        }
+      });
+    }
+  }
+  connect(req, ip) {
+    const dstSocket = import_net.default.createConnection({
+      port: req.port,
+      // port from client's requests
+      host: ip
+      // ip from dns lookup of socks proxy server
+    });
+    dstSocket.on("connect", () => {
+      this.replySuccess();
+      this._socket.pipe(dstSocket).pipe(this._socket);
+    }).on("error", (err) => {
+      console.error(
+        `[Socks5/Connection] ${this._session.id} -> dstSocket`,
+        err
+      );
+    }).on("end", () => {
+      console.log(`[Socks5/Connection] ${this._session.id} -> dstSocket end`);
+    }).on("close", () => {
+      console.log(
+        `[Socks5/Connection] ${this._session.id} -> dstSocket close`
+      );
+    });
+    this._session.dstSocket = dstSocket;
+  }
+  get dstSocket() {
+    return this._session.dstSocket;
+  }
+  replySuccess() {
+    let bytes = [
+      constant_default.SOCKS_VERSION,
+      constant_default.REP.SUCCEEDED[0],
+      constant_default.RSV,
+      constant_default.ATYP.IPV4[0]
+    ].concat(ipbytes(this.dstSocket?.localAddress || "127.0.0.1")).concat([0, 0]);
+    let reply = Buffer.from(bytes);
+    this._socket.write(reply);
+  }
+  /**
+   * called by socket's 'data' event listener
+   */
+  handle(buf) {
+    if (this._session.state < constant_default.STATE.PROXY_FORWARD) {
+      this._session.buffer = Buffer.concat([this._session.buffer, buf]);
+    }
+    const discardProcessedBytes = (nextState) => {
+      this._session.buffer = this._session.buffer.subarray(
+        this._session.offset
+      );
+      this._session.offset = 0;
+      this._session.state = nextState;
+    };
+    switch (this._session.state) {
+      case constant_default.STATE.METHOD_NEGOTIATION:
+        const methods = this.parseMethods();
+        if (methods) {
+          let method = this.selectMethod(methods);
+          this.replyMethod(method);
+          switch (method) {
+            case constant_default.METHODS.USERNAME_PASSWD:
+              discardProcessedBytes(constant_default.STATE.AUTHENTICATION);
+              break;
+            case constant_default.METHODS.NO_AUTH:
+              discardProcessedBytes(constant_default.STATE.REQUEST_CONNECT);
+              break;
+            case constant_default.METHODS.NO_ACCEPTABLE:
+              this._socket.end();
+              break;
+            default:
+              this._socket.end();
+          }
+        }
+        break;
+      case constant_default.STATE.AUTHENTICATION:
+        let userinfo = this.parseUsernamePasswd();
+        if (!!userinfo) {
+          let succeeded = userinfo.username === config.username && userinfo.passwd === config.passwd;
+          discardProcessedBytes(
+            succeeded ? constant_default.STATE.REQUEST_CONNECT : constant_default.STATE.AUTHENTICATION
+          );
+          this.replyAuth(succeeded);
+        }
+        break;
+      case constant_default.STATE.REQUEST_CONNECT:
+        let req = this.parseRequests();
+        if (req) {
+          discardProcessedBytes(constant_default.STATE.PROXY_FORWARD);
+          this.dstConnect(req);
+        }
+        break;
+      case constant_default.STATE.PROXY_FORWARD:
+      default:
+        break;
+    }
+  }
+};
+
+// src/service/socks5/index.ts
+function socks5({ host, port, callback }) {
+  const server = import_net2.default.createServer();
+  server.listen(port, host).on("listening", () => {
+    console.log(`[ProxyServer/Socks5] Listening on ${port}`);
+  }).on("error", (err) => {
+    console.error("[ProxyServer/Socks5] Host error", err);
+  }).on("connection", (socket) => {
+    const proxy = new S5Proxy(socket);
+    callback && (proxy.onConnection = callback);
+    socket.on("close", (hadError) => {
+      console.log(
+        `[Socks5/Connection] ${proxy.sessionId} closed`,
+        hadError ? "with error" : ""
+      );
+    }).on("error", (err) => {
+      console.error(`[Socks5/Connection] Socket ${proxy.sessionId}`, err);
+    });
+  });
+}
+
 // src/service/host.ts
 var ProxyServer = class {
   _options;
@@ -40396,99 +41013,83 @@ var ProxyServer = class {
     this._ctl = this._chnManager.controller;
     this._pac = pac;
   }
-  async connect(req, sock) {
-    const u = new URL("http://" + req.url);
+  async connect(sock, version2, req, hostname, port, onsuccess = () => {
+  }) {
     const opt = {
-      port: parseInt(u.port) || 443,
-      host: u.hostname
+      port: 443,
+      host: ""
     };
+    if (hostname) {
+      opt.host = hostname;
+      opt.port = port || 443;
+    } else if (req) {
+      const u = new URL("http://" + req.url);
+      opt.host = u.hostname;
+      opt.port = parseInt(u.port) || 443;
+    } else {
+      sock.end();
+      return;
+    }
     try {
       const chn = await this._chnManager.requireConnection();
       console.log("[Channel/Socket]", chn.path, chn.cid, "conn established.");
       await this._ctl.callRemoteProc(
         {
           cmd: "C" /* CONNECT */,
-          data: { cid: chn.cid, opt }
+          data: { cid: chn.cid, opt, v: version2 }
         },
         5e3,
         true
       );
-      chn.on("error", (e) => {
-        console.log("ERROR", e);
-        sock.push(null);
-      });
-      sock.on("error", (e) => {
-        console.log("ERROR", e);
-        chn.push(null);
-      });
+      chn.on("error", () => sock.push(null));
+      sock.on("error", () => chn.push(null));
       sock.once("close", () => this._chnManager.kill(chn, 4));
+      onsuccess();
       chn.pipe(sock);
       sock.pipe(chn);
     } catch (e) {
       sock.end();
     }
   }
-  // private request(req: IncomingMessage, res: ServerResponse) {
-  //   const u = new URL(req.url);
-  //   let chn: Channel;
-  //   const opt = {
-  //     hostname: u.hostname,
-  //     port: u.port || 80,
-  //     path: u.pathname + u.search,
-  //     method: req.method,
-  //     headers: req.headers,
-  //   };
-  //   const onEstablished = (msg: { data: number; tk: string }) => {
-  //     const { data: cid, tk } = msg;
-  //     chn = this._chnManager.createChannel(cid);
-  //     console.log(
-  //       "[Channel/Request]",
-  //       chn.path,
-  //       chn.cid,
-  //       "Connection established."
-  //     );
-  //     this._ctl.sendCtlMessage(
-  //       {
-  //         cmd: CtlMessageCommand.REQUEST,
-  //         tk,
-  //         flag: CtlMessageFlag.CONTROL,
-  //         data: { cid, opt },
-  //       },
-  //       null
-  //     );
-  //     chn.on("error", (e: any) => {
-  //       console.error("ERROR", e);
-  //       res.end();
-  //     });
-  //     res.on("error", (e) => {
-  //       console.error("ERROR", e);
-  //       chn.push(null);
-  //     });
-  //     res.once("close", () => {
-  //       this._chnManager.deleteChannel(chn);
-  //     });
-  //     chn.pipe(res);
-  //     req.pipe(chn);
-  //   };
-  //   console.log("[Channel/Request]", "Connecting", u.href, u.port);
-  //   this._ctl.sendCtlMessage(
-  //     {
-  //       cmd: CtlMessageCommand.ESTABLISH,
-  //       tk: null,
-  //       flag: CtlMessageFlag.CONTROL,
-  //     },
-  //     onEstablished as any
-  //   );
-  // }
-  listen() {
+  startHosts() {
     this._hosts.forEach((host) => host.start());
+  }
+  listenOnSocks5() {
+    this.startHosts();
+    socks5({
+      host: this._options.listen || "0.0.0.0",
+      port: this._options.port || 13808,
+      callback: this.socks5Request.bind(this)
+    });
+  }
+  async socks5Request(req, proxy) {
+    const targetHostname = req.domain || req.ip;
+    const targetPort = req.port;
+    console.log(
+      "[ProxyServer/Socks5]",
+      "Connecting",
+      targetHostname,
+      targetPort
+    );
+    this.connect(proxy.socket, 5, null, targetHostname, targetPort, () => {
+      proxy.replySuccess();
+      console.log(
+        "[ProxyServer/Socks5]",
+        "Connected",
+        targetHostname,
+        targetPort
+      );
+    });
+  }
+  listen() {
+    this.startHosts();
     (0, import_http.createServer)().on("connect", (req, cSock) => {
       if (!this._pac || this._pac.isProxy(req.url)) {
-        this.connect(req, cSock);
+        this.connect(cSock, 0, req, null, null);
         console.log("[ProxyServer/Socket]", "Connecting/Proxy", req.url);
       } else {
         const url = new URL("http://" + req.url);
-        const pSock = (0, import_net.connect)(
+        const pSock = (0, import_net3.connect)(
           {
             port: parseInt(url.port) || 443,
             host: url.hostname
@@ -40627,13 +41228,16 @@ function getArgs() {
 function getCommand() {
   return command;
 }
+function hasOption(name, alias) {
+  return map.has(name) || map.has(alias);
+}
 function getOption(name, alias, defaultValue) {
   return map.get(name) || map.get(alias) || defaultValue;
 }
 
 // src/service/request.ts
 var import_https = require("https");
-var import_net2 = require("net");
+var import_net4 = require("net");
 function redirectRequestToChn(reqInfo, chn, onClose) {
   const pReq = (0, import_https.request)(reqInfo, function(pRes) {
     pRes.pipe(chn);
@@ -40646,8 +41250,19 @@ function redirectRequestToChn(reqInfo, chn, onClose) {
   pReq.once("close", onClose);
 }
 function redirectConnectToChn(reqInfo, chn, onClose) {
-  const socket = (0, import_net2.connect)(reqInfo, function() {
+  const socket = (0, import_net4.connect)(reqInfo, function() {
     chn.write(Buffer.from("HTTP/1.1 200 Connection established\r\n\r\n"));
+    socket.pipe(chn);
+    chn.pipe(socket);
+    console.log("[ProxyEndPoint/Socket]", chn.cid, "Connected");
+  }).on("error", function(e) {
+    console.log("ERROR", reqInfo, e);
+    chn.push(null);
+  });
+  socket.once("close", onClose);
+}
+function redirectSocks5ToChn(reqInfo, chn, onClose) {
+  const socket = (0, import_net4.connect)(reqInfo, function() {
     socket.pipe(chn);
     chn.pipe(socket);
     console.log("[ProxyEndPoint/Socket]", chn.cid, "Connected");
@@ -40726,7 +41341,7 @@ var ProxyEndPoint = class {
   async onCtlMessageReceived(msg) {
     switch (msg.cmd) {
       case "C" /* CONNECT */: {
-        const { cid, opt } = msg.data;
+        const { cid, opt, v } = msg.data;
         const channel = this._channelManager.get(cid);
         if (this._rule) {
           const [host, port] = await this._rule.getAsync(opt.host, opt.port);
@@ -40742,10 +41357,17 @@ var ProxyEndPoint = class {
           opt.port
         );
         if (channel) {
-          redirectConnectToChn(opt, channel, () => {
-            console.log("[ProxyEndPoint/Socket]", cid, "Channel is closing.");
-            this._channelManager.kill(channel, 1);
-          });
+          if (v === 5) {
+            redirectSocks5ToChn(opt, channel, () => {
+              console.log("[ProxyEndPoint/Socks5]", cid, "Channel is closing.");
+              this._channelManager.kill(channel, 1);
+            });
+          } else if (v === 0) {
+            redirectConnectToChn(opt, channel, () => {
+              console.log("[ProxyEndPoint/Socket]", cid, "Channel is closing.");
+              this._channelManager.kill(channel, 1);
+            });
+          }
         } else {
           console.log("[ProxyEndPoint/Socket]", "Channel not found:", cid);
         }
@@ -40908,7 +41530,7 @@ function notFound(res) {
 var import_os = __toESM(require("os"));
 
 // src/vc.js
-var version = "1.0.18";
+var version = "1.0.37";
 
 // src/service/messenger.ts
 var import_child_process = require("child_process");
@@ -41617,7 +42239,14 @@ async function main() {
         pac = await Pac.loadFromPacFile(pacFile);
         console.log(`PAC file loaded from ${pacFile}`);
       }
-      new ProxyServer(opts, pac).listen();
+      const ps = new ProxyServer(opts, pac);
+      if (hasOption("5", "socks5")) {
+        ps.listenOnSocks5();
+        console.log(`Socks5 proxy server listening on ${opts.listen}:${opts.port}`);
+      } else {
+        ps.listen();
+        console.log(`Http proxy server listening on ${opts.listen}:${opts.port}`);
+      }
       break;
     case "test":
       await test(getArgs());

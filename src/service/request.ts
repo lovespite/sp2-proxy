@@ -40,3 +40,23 @@ export function redirectConnectToChn(
 
   socket.once("close", onClose);
 }
+
+export function redirectSocks5ToChn(
+  reqInfo: NetConnectOpts,
+  chn: Channel,
+  onClose: () => void
+) {
+  const socket = connect(reqInfo, function () {
+    // chn.write(Buffer.from("HTTP/1.1 200 Connection established\r\n\r\n"));
+
+    socket.pipe(chn);
+    chn.pipe(socket);
+
+    console.log("[ProxyEndPoint/Socket]", chn.cid, "Connected");
+  }).on("error", function (e) {
+    console.log("ERROR", reqInfo, e);
+    chn.push(null);
+  });
+
+  socket.once("close", onClose);
+}

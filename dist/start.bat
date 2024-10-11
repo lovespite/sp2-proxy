@@ -1,0 +1,1 @@
+node %~dp0%index.js host --serial-port=COM11 --baud-rate=230400

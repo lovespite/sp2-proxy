@@ -66,7 +66,14 @@ async function main() {
         pac = await Pac.loadFromPacFile(pacFile);
         console.log(`PAC file loaded from ${pacFile}`);
       }
-      new ProxyServer(opts, pac).listen();
+      const ps = new ProxyServer(opts, pac);
+      if (opt.hasOption("5", "socks5")) {
+        ps.listenOnSocks5();
+        console.log(`Socks5 proxy server listening on ${opts.listen}:${opts.port}`);
+      } else {
+        ps.listen();
+        console.log(`Http proxy server listening on ${opts.listen}:${opts.port}`);
+      }
       break;
     case "test":
       await test(opt.getArgs());

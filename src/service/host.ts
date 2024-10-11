@@ -7,51 +7,8 @@ import { ChannelManager } from "../model/ChannelManager";
 import { CtlMessageCommand } from "../model/ControllerChannel";
 import { ControllerChannel } from "../model/ControllerChannel";
 import * as fsys from "../utils/fsys";
-
-// function request(cReq: IncomingMessage, cRes: ServerResponse) {
-//   const u = new URL(cReq.url);
-
-//   const options = {
-//     hostname: u.hostname,
-//     port: u.port || 80,
-//     path: u.pathname + u.search,
-//     method: cReq.method,
-//     headers: cReq.headers,
-//   };
-
-//   console.log("FETCH", u.href);
-
-//   const pReq = _request(options, function (pRes) {
-//     cRes.writeHead(pRes.statusCode, pRes.headers);
-//     pRes.pipe(cRes);
-//   }).on("error", function (e) {
-//     console.log("ERROR", cReq.url, e);
-//     cRes.end();
-//   });
-
-//   cReq.pipe(pReq);
-// }
-
-// function connect(cReq: IncomingMessage, cSock: internal.Duplex) {
-//   const u = new URL("http://" + cReq.url);
-
-//   const options: NetConnectOpts = {
-//     port: parseInt(u.port) || 80,
-//     host: u.hostname,
-//   };
-
-//   console.log("CONNECT", u.href);
-
-//   const pSock = _connect(options, function () {
-//     cSock.write("HTTP/1.1 200 Connection Established\r\n\r\n");
-//     pSock.pipe(cSock);
-//   }).on("error", function (e) {
-//     console.log("ERROR", cReq.url, e);
-//     cSock.end();
-//   });
-
-//   cSock.pipe(pSock);
-// }
+import { socks5 } from "./socks5/index";
+import S5Proxy, { S5ProxyRequest } from "./socks5/proxy";
 
 export type ProxyOptions = {
   serialPorts: SerialPort[];
@@ -78,13 +35,30 @@ export class ProxyServer {
     this._pac = pac;
   }
 
-  private async connect(req: IncomingMessage, sock: internal.Duplex) {
-    const u = new URL("http://" + req.url);
-
+  private async connect(
+    sock: internal.Duplex,
+    version: 0 | 5,
+    req: IncomingMessage | null,
+    hostname: string | null,
+    port: number | null,
+    onsuccess: () => void = () => {}
+  ) {
     const opt: NetConnectOpts = {
-      port: parseInt(u.port) || 443,
-      host: u.hostname,
+      port: 443,
+      host: "",
     };
+
+    if (hostname) {
+      opt.host = hostname;
+      opt.port = port || 443;
+    } else if (req) {
+      const u = new URL("http://" + req.url);
+      opt.host = u.hostname;
+      opt.port = parseInt(u.port) || 443;
+    } else {
+      sock.end();
+      return;
+    }
 
     try {
       const chn = await this._chnManager.requireConnection();
@@ -93,22 +67,18 @@ export class ProxyServer {
       await this._ctl.callRemoteProc(
         {
           cmd: CtlMessageCommand.CONNECT,
-          data: { cid: chn.cid, opt },
+          data: { cid: chn.cid, opt, v: version },
         },
         5000,
         true
       );
 
-      chn.on("error", (e: any) => {
-        console.log("ERROR", e);
-        sock.push(null);
-      });
-      sock.on("error", (e) => {
-        console.log("ERROR", e);
-        chn.push(null);
-      });
+      chn.on("error", () => sock.push(null));
+      sock.on("error", () => chn.push(null));
 
       sock.once("close", () => this._chnManager.kill(chn, 0x4));
+
+      onsuccess();
 
       chn.pipe(sock);
       sock.pipe(chn);
@@ -117,73 +87,47 @@ export class ProxyServer {
     }
   }
 
-  // private request(req: IncomingMessage, res: ServerResponse) {
-  //   const u = new URL(req.url);
-  //   let chn: Channel;
+  private startHosts() {
+    this._hosts.forEach((host) => host.start());
+  }
 
-  //   const opt = {
-  //     hostname: u.hostname,
-  //     port: u.port || 80,
-  //     path: u.pathname + u.search,
-  //     method: req.method,
-  //     headers: req.headers,
-  //   };
+  public listenOnSocks5() {
+    this.startHosts();
+    socks5({
+      host: this._options.listen || "0.0.0.0",
+      port: this._options.port || 13808,
+      callback: this.socks5Request.bind(this),
+    });
+  }
 
-  //   const onEstablished = (msg: { data: number; tk: string }) => {
-  //     const { data: cid, tk } = msg;
+  private async socks5Request(req: S5ProxyRequest, proxy: S5Proxy) {
+    const targetHostname = req.domain || req.ip;
+    const targetPort = req.port;
+    console.log(
+      "[ProxyServer/Socks5]",
+      "Connecting",
+      targetHostname,
+      targetPort
+    );
 
-  //     chn = this._chnManager.createChannel(cid);
-
-  //     console.log(
-  //       "[Channel/Request]",
-  //       chn.path,
-  //       chn.cid,
-  //       "Connection established."
-  //     );
-  //     this._ctl.sendCtlMessage(
-  //       {
-  //         cmd: CtlMessageCommand.REQUEST,
-  //         tk,
-  //         flag: CtlMessageFlag.CONTROL,
-  //         data: { cid, opt },
-  //       },
-  //       null
-  //     );
-
-  //     chn.on("error", (e: any) => {
-  //       console.error("ERROR", e);
-  //       res.end();
-  //     });
-  //     res.on("error", (e) => {
-  //       console.error("ERROR", e);
-  //       chn.push(null);
-  //     });
-  //     res.once("close", () => {
-  //       this._chnManager.deleteChannel(chn);
-  //     });
-
-  //     chn.pipe(res);
-  //     req.pipe(chn);
-  //   };
-
-  //   console.log("[Channel/Request]", "Connecting", u.href, u.port);
-  //   this._ctl.sendCtlMessage(
-  //     {
-  //       cmd: CtlMessageCommand.ESTABLISH,
-  //       tk: null,
-  //       flag: CtlMessageFlag.CONTROL,
-  //     },
-  //     onEstablished as any
-  //   );
-  // }
+    this.connect(proxy.socket, 5, null, targetHostname, targetPort, () => {
+      proxy.replySuccess();
+      console.log(
+        "[ProxyServer/Socks5]",
+        "Connected",
+        targetHostname,
+        targetPort
+      );
+    });
+  }
 
   public listen() {
-    this._hosts.forEach((host) => host.start());
+    this.startHosts();
     createServer()
       // .on("request", this.request.bind(this))
       .on("connect", (req, cSock) => {
         if (!this._pac || this._pac.isProxy(req.url)) {
-          this.connect(req, cSock);
+          this.connect(cSock, 0, req, null, null);
           console.log("[ProxyServer/Socket]", "Connecting/Proxy", req.url);
         } else {
           const url = new URL("http://" + req.url);
