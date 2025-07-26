@@ -41526,7 +41526,7 @@ function notFound(res) {
 var import_os = __toESM(require("os"));
 
 // src/vc.js
-var version = "1.0.41";
+var version = "1.0.42";
 
 // src/service/messenger.ts
 var import_child_process = require("child_process");
@@ -42249,7 +42249,7 @@ async function main() {
       serialPorts = await openSerialPorts([serialPortOpts[0]], baudRates);
       const msg = new Messenger(serialPorts[0]);
       msg.start({
-        port: parseInt(getOption("port", "p", "13809")),
+        port: parseInt(getOption("port", "p", "13810")),
         listen: getOption("listen", "l", "127.0.0.1")
       });
       break;
